@@ -61,6 +61,10 @@ if "%TRUSTED_TELEGRAM_USER_IDS%"=="" if not "%SAVED_SETTINGS_LOADED%"=="1" (
 
 call :save_config
 
+echo.
+echo Opening web app in fullscreen browser window...
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\open-webapp-fullscreen.ps1" -Url "%WEB_APP_URL%"
+
 if not exist "node_modules" (
   echo.
   echo Installing npm dependencies...
