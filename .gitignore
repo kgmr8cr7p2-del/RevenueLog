@@ -4,3 +4,4 @@ dist/
 server/data/
 npm-debug.log*
 *.log
+telegram-menu.config.local.bat

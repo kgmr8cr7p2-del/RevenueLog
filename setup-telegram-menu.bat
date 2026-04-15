@@ -3,14 +3,27 @@ setlocal
 
 cd /d "%~dp0"
 
+set "CONFIG_FILE=%~dp0telegram-menu.config.local.bat"
+
 echo.
 echo Telegram Mini App menu setup
 echo ============================
 echo.
-echo This script does not save your bot token to any project file.
+echo Settings are saved only in telegram-menu.config.local.bat on this computer.
 echo.
 
-for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$s = Read-Host 'Paste Telegram bot token' -AsSecureString; $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }"`) do set "BOT_TOKEN=%%A"
+if exist "%CONFIG_FILE%" (
+  set "USE_SAVED=Y"
+  set /p USE_SAVED=Use saved settings? [Y/n]:
+  if /i not "%USE_SAVED%"=="N" (
+    call "%CONFIG_FILE%"
+    set "SAVED_SETTINGS_LOADED=1"
+  )
+)
+
+if "%BOT_TOKEN%"=="" (
+  for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$s = Read-Host 'Paste Telegram bot token' -AsSecureString; $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }"`) do set "BOT_TOKEN=%%A"
+)
 
 if "%BOT_TOKEN%"=="" (
   echo.
@@ -20,7 +33,9 @@ if "%BOT_TOKEN%"=="" (
 )
 
 echo.
-set /p WEB_APP_URL=Paste GitHub Pages HTTPS URL:
+if "%WEB_APP_URL%"=="" (
+  set /p WEB_APP_URL=Paste GitHub Pages HTTPS URL:
+)
 
 if "%WEB_APP_URL%"=="" (
   echo.
@@ -40,7 +55,11 @@ if errorlevel 1 (
 echo.
 echo Paste trusted Telegram user IDs separated by comma.
 echo Leave empty only for testing.
-set /p TRUSTED_TELEGRAM_USER_IDS=Trusted user IDs:
+if "%TRUSTED_TELEGRAM_USER_IDS%"=="" if not "%SAVED_SETTINGS_LOADED%"=="1" (
+  set /p TRUSTED_TELEGRAM_USER_IDS=Trusted user IDs:
+)
+
+call :save_config
 
 if not exist "node_modules" (
   echo.
@@ -80,5 +99,17 @@ set "RESULT=%ERRORLEVEL%"
 set "BOT_TOKEN="
 set "WEB_APP_URL="
 set "TRUSTED_TELEGRAM_USER_IDS="
+set "SAVED_SETTINGS_LOADED="
 pause
 exit /b %RESULT%
+
+:save_config
+(
+  echo @echo off
+  echo set "BOT_TOKEN=%BOT_TOKEN%"
+  echo set "WEB_APP_URL=%WEB_APP_URL%"
+  echo set "TRUSTED_TELEGRAM_USER_IDS=%TRUSTED_TELEGRAM_USER_IDS%"
+) > "%CONFIG_FILE%"
+echo.
+echo Settings saved to telegram-menu.config.local.bat
+exit /b 0
