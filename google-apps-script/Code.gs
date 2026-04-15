@@ -1,5 +1,6 @@
 const SPREADSHEET_ID = '1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs';
 const SHEET_NAME = 'PC Builds';
+const SCHEMA_VERSION = 2;
 
 const STATUSES = ['assembly', 'paid', 'shipping', 'received'];
 const COMPONENTS = [
@@ -79,7 +80,8 @@ function route_(action, payload) {
     return {
       items,
       summary: buildSummary_(items),
-      storage: 'google-sheets'
+      storage: 'google-sheets',
+      schemaVersion: SCHEMA_VERSION
     };
   }
 
@@ -216,7 +218,14 @@ function fromRow_(row) {
   if (!json) return null;
 
   try {
-    return JSON.parse(json);
+    const item = JSON.parse(json);
+    HEADER.forEach((key, index) => {
+      const value = row[index];
+      if (value === '' || value === undefined || item[key] !== undefined) return;
+      item[key] = key === 'archived' ? value === true || value === 'TRUE' || value === 'true' : value;
+    });
+    if (item.archived === undefined) item.archived = false;
+    return item;
   } catch (error) {
     return null;
   }

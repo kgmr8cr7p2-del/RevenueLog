@@ -89,7 +89,14 @@ function fromRow(row) {
   if (!json) return null;
 
   try {
-    return JSON.parse(json);
+    const item = JSON.parse(json);
+    HEADER.forEach((key, index) => {
+      const value = row[index];
+      if (value === '' || value === undefined || item[key] !== undefined) return;
+      item[key] = key === 'archived' ? value === true || value === 'TRUE' || value === 'true' : value;
+    });
+    if (item.archived === undefined) item.archived = false;
+    return item;
   } catch {
     return null;
   }

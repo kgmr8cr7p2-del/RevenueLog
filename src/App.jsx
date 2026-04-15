@@ -8,6 +8,8 @@ import FinanceTab from './components/FinanceTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
+const REQUIRED_SCHEMA_VERSION = 2;
+
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
   { id: 'finance', title: 'Расчеты' },
@@ -35,6 +37,11 @@ export default function App() {
       const data = await fetchBuilds();
       setBuilds(data.items || []);
       setStorage(data.storage || '');
+      if (data.storage === 'google-sheets' && data.schemaVersion < REQUIRED_SCHEMA_VERSION) {
+        setError(
+          'Google Apps Script еще не обновлен. Архив и новые поля не будут сохраняться, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
+        );
+      }
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -121,6 +128,13 @@ export default function App() {
     setBuilds((current) => current.map((item) => (item.id === build.id ? nextBuild : item)));
     try {
       const updated = await updateBuild(build.id, nextBuild);
+      if (Boolean(updated?.archived) !== archived) {
+        setBuilds(previous);
+        setError(
+          'Архив не сохранился: Google Apps Script работает на старой версии. Обновите Code.gs и сделайте New version -> Deploy.'
+        );
+        return;
+      }
       setBuilds((current) => current.map((item) => (item.id === build.id ? updated : item)));
     } catch (requestError) {
       setBuilds(previous);

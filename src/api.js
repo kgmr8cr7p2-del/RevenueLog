@@ -81,7 +81,8 @@ export async function fetchBuilds() {
     return {
       items: data.items || [],
       summary: data.summary || {},
-      storage: data.storage || 'google-sheets'
+      storage: data.storage || 'google-sheets',
+      schemaVersion: data.schemaVersion || 0
     };
   }
 

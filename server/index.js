@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const store = await createStore();
+const schemaVersion = 2;
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -35,7 +36,7 @@ app.get('/api/health', (req, res) => {
 app.get('/api/builds', async (req, res, next) => {
   try {
     const items = await store.list();
-    res.json({ items, summary: buildSummary(items), storage: store.type });
+    res.json({ items, summary: buildSummary(items), storage: store.type, schemaVersion });
   } catch (error) {
     next(error);
   }
