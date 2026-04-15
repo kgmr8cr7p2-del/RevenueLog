@@ -19,53 +19,6 @@ function roundRate(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 
-async function fetchBybitSellRate() {
-  const response = await fetch('https://api2.bybit.com/fiat/otc/item/online', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'Mozilla/5.0'
-    },
-    body: JSON.stringify({
-      userId: '',
-      tokenId: 'USDT',
-      currencyId: 'RUB',
-      payment: [],
-      side: '0',
-      size: '10',
-      page: '1',
-      amount: '',
-      authMaker: false,
-      canTrade: false
-    })
-  });
-
-  if (!response.ok) throw new Error(`Bybit returned HTTP ${response.status}`);
-  const data = await response.json();
-  if (data.ret_code !== 0 && data.retCode !== 0) {
-    throw new Error(data.ret_msg || data.retMsg || 'Bybit returned an error');
-  }
-
-  const prices = (data.result?.items || [])
-    .map((item) => Number(item.price))
-    .filter((price) => Number.isFinite(price) && price > 0)
-    .slice(0, 5);
-  if (!prices.length) throw new Error('Bybit rate is empty');
-
-  const value = roundRate(prices.reduce((sum, price) => sum + price, 0) / prices.length);
-  return {
-    value,
-    source: 'Bybit P2P USDT/RUB',
-    side: 'sell',
-    fetchedAt: new Date().toISOString(),
-    prices: prices.map(roundRate),
-    values: prices.map((price, index) => ({
-      label: `Bybit продажа #${index + 1}`,
-      value: roundRate(price)
-    }))
-  };
-}
-
 async function fetchOpenMarketRate() {
   const results = await Promise.allSettled([
     fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=rub')
@@ -98,7 +51,7 @@ async function fetchOpenMarketRate() {
 
   return {
     value: roundRate(values.reduce((sum, item) => sum + item.value, 0) / values.length),
-    source: 'Среднее из браузерных источников',
+    source: 'Ориентир USDT/RUB без Bybit API',
     side: 'sell',
     fetchedAt: new Date().toISOString(),
     prices: values.map((item) => item.value),
@@ -107,14 +60,7 @@ async function fetchOpenMarketRate() {
 }
 
 async function fetchExchangeRate() {
-  try {
-    return await fetchBybitSellRate();
-  } catch (error) {
-    return {
-      ...(await fetchOpenMarketRate()),
-      fallbackReason: 'Bybit P2P не отдал данные напрямую'
-    };
-  }
+  return fetchOpenMarketRate();
 }
 
 app.use(cors());
