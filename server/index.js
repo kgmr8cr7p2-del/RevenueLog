@@ -13,7 +13,48 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const store = await createStore();
-const schemaVersion = 3;
+const schemaVersion = 4;
+
+async function fetchBybitSellRate() {
+  const response = await fetch('https://api2.bybit.com/fiat/otc/item/online', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'User-Agent': 'Mozilla/5.0'
+    },
+    body: JSON.stringify({
+      userId: '',
+      tokenId: 'USDT',
+      currencyId: 'RUB',
+      payment: [],
+      side: '0',
+      size: '10',
+      page: '1',
+      amount: '',
+      authMaker: false,
+      canTrade: false
+    })
+  });
+
+  if (!response.ok) throw new Error(`Bybit returned HTTP ${response.status}`);
+  const data = await response.json();
+  if (data.ret_code !== 0 && data.retCode !== 0) {
+    throw new Error(data.ret_msg || data.retMsg || 'Bybit returned an error');
+  }
+
+  const prices = (data.result?.items || [])
+    .map((item) => Number(item.price))
+    .filter((price) => Number.isFinite(price) && price > 0);
+  if (!prices.length) throw new Error('Bybit rate is empty');
+
+  return {
+    value: Math.round((prices[0] + Number.EPSILON) * 100) / 100,
+    source: 'Bybit P2P USDT/RUB',
+    side: 'sell',
+    fetchedAt: new Date().toISOString(),
+    prices: prices.slice(0, 5).map((price) => Math.round((price + Number.EPSILON) * 100) / 100)
+  };
+}
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -37,6 +78,14 @@ app.get('/api/builds', async (req, res, next) => {
   try {
     const items = await store.list();
     res.json({ items, summary: buildSummary(items), storage: store.type, schemaVersion });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/exchange-rate', async (req, res, next) => {
+  try {
+    res.json(await fetchBybitSellRate());
   } catch (error) {
     next(error);
   }

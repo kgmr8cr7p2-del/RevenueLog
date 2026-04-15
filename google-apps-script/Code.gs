@@ -1,8 +1,14 @@
 const SPREADSHEET_ID = '1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs';
 const SHEET_NAME = 'PC Builds';
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 const STATUSES = ['assembly', 'paid', 'shipping', 'received'];
+const STATUS_TITLES = {
+  assembly: 'Сборка',
+  paid: 'Оплачен',
+  shipping: 'Едет к покупателю',
+  received: 'Покупатель получил'
+};
 const COMPONENTS = [
   { key: 'cpu', label: 'Процессор' },
   { key: 'motherboard', label: 'Материнская плата' },
@@ -83,6 +89,10 @@ function route_(action, payload) {
       storage: 'google-sheets',
       schemaVersion: SCHEMA_VERSION
     };
+  }
+
+  if (action === 'exchangeRate') {
+    return { rate: fetchBybitSellRate_() };
   }
 
   if (action === 'create') {
@@ -185,6 +195,7 @@ function updateBuild_(id, payload) {
   const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
   const item = normalizeBuild_(Object.assign({}, payload || {}, { id }), existing);
   sheet.getRange(rowNumber, 1, 1, HEADER.length).setValues([toRow_(item)]);
+  sendStatusNotificationIfNeeded_(item, existing && existing.status);
   return item;
 }
 
@@ -196,6 +207,7 @@ function updateStatus_(id, status) {
   const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
   const item = normalizeBuild_(Object.assign({}, existing, { status }), existing);
   sheet.getRange(rowNumber, 1, 1, HEADER.length).setValues([toRow_(item)]);
+  sendStatusNotificationIfNeeded_(item, existing && existing.status);
   return item;
 }
 
@@ -491,6 +503,52 @@ function roundMoney_(value) {
   return Math.round((toNumber_(value) + Number.EPSILON) * 100) / 100;
 }
 
+function fetchBybitSellRate_() {
+  const response = UrlFetchApp.fetch('https://api2.bybit.com/fiat/otc/item/online', {
+    method: 'post',
+    contentType: 'application/json',
+    muteHttpExceptions: true,
+    headers: {
+      'User-Agent': 'Mozilla/5.0'
+    },
+    payload: JSON.stringify({
+      userId: '',
+      tokenId: 'USDT',
+      currencyId: 'RUB',
+      payment: [],
+      side: '0',
+      size: '10',
+      page: '1',
+      amount: '',
+      authMaker: false,
+      canTrade: false
+    })
+  });
+
+  const code = response.getResponseCode();
+  if (code >= 400) {
+    throw new Error(`Bybit returned HTTP ${code}`);
+  }
+
+  const data = JSON.parse(response.getContentText());
+  if (data.ret_code !== 0 && data.retCode !== 0) {
+    throw new Error(data.ret_msg || data.retMsg || 'Bybit returned an error');
+  }
+
+  const prices = ((data.result && data.result.items) || [])
+    .map((item) => toNumber_(item.price))
+    .filter((price) => price > 0);
+  if (!prices.length) throw new Error('Bybit rate is empty');
+
+  return {
+    value: roundMoney_(prices[0]),
+    source: 'Bybit P2P USDT/RUB',
+    side: 'sell',
+    fetchedAt: new Date().toISOString(),
+    prices: prices.slice(0, 5).map(roundMoney_)
+  };
+}
+
 function checkAssemblyNotifications() {
   const properties = PropertiesService.getScriptProperties();
   const botToken = properties.getProperty('BOT_TOKEN');
@@ -564,6 +622,39 @@ function checkAssemblyNotifications() {
   });
 
   return { checked, updated, messages };
+}
+
+function sendStatusNotificationIfNeeded_(item, previousStatus) {
+  if (!previousStatus || previousStatus === item.status) return 0;
+
+  const properties = PropertiesService.getScriptProperties();
+  const botToken = properties.getProperty('BOT_TOKEN');
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  if (!botToken || !trustedUserIds.length) return 0;
+
+  return sendTelegramMessageToTrusted_(
+    buildStatusNotificationText_(item, previousStatus),
+    properties
+  );
+}
+
+function buildStatusNotificationText_(item, previousStatus) {
+  const lines = [
+    'Статус сборки изменен',
+    `ПК: ${item.pcNumber || 'без номера'}`,
+    `Договор: ${item.contractNumber || '-'}`,
+    `Было: ${getStatusTitle_(previousStatus)}`,
+    `Стало: ${getStatusTitle_(item.status)}`
+  ];
+
+  if (item.telegramId) lines.push(`Покупатель: ${item.telegramId}`);
+  if (item.trackingNumber) lines.push(`Трек-номер: ${item.trackingNumber}`);
+  if (item.buildDeadline) lines.push(`Дедлайн: ${item.buildDeadline}`);
+  return lines.join('\n');
+}
+
+function getStatusTitle_(status) {
+  return STATUS_TITLES[status] || status || '-';
 }
 
 function setupAssemblyNotificationTrigger() {

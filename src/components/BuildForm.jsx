@@ -10,6 +10,7 @@ import {
   toDateInputValue,
   toNumber
 } from '../../shared/calculations.js';
+import { fetchExchangeRate } from '../api.js';
 import SummaryCard from './SummaryCard.jsx';
 
 function createEmptyBuild() {
@@ -77,6 +78,8 @@ function normalizeForForm(build) {
 
 export default function BuildForm({ build, onClose, onSave, onDelete, saving }) {
   const [form, setForm] = useState(() => normalizeForForm(build));
+  const [rateLoading, setRateLoading] = useState(false);
+  const [rateMessage, setRateMessage] = useState('');
   const totals = useMemo(() => calculateTotals(form), [form]);
   const isEditing = Boolean(build?.id);
   const needsExchangeRate =
@@ -106,6 +109,22 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
       next.components[index][field] = value;
       return next;
     });
+  }
+
+  async function loadAutomaticRate() {
+    setRateLoading(true);
+    setRateMessage('');
+    try {
+      const rate = await fetchExchangeRate();
+      updateField('paid.exchangeRate', rate.value);
+      setRateMessage(
+        `Bybit P2P: ${rate.value} ₽, ${new Date(rate.fetchedAt).toLocaleString('ru-RU')}`
+      );
+    } catch (error) {
+      setRateMessage(error.message || 'Не удалось получить курс');
+    } finally {
+      setRateLoading(false);
+    }
   }
 
   function submit(event) {
@@ -267,6 +286,15 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
                 onChange={(event) => updateField('paid.exchangeRate', event.target.value)}
                 placeholder="Например: 92"
               />
+              <button
+                type="button"
+                className="inline-action-button"
+                onClick={loadAutomaticRate}
+                disabled={rateLoading}
+              >
+                {rateLoading ? 'Загрузка...' : 'Взять с Bybit'}
+              </button>
+              {rateMessage ? <small>{rateMessage}</small> : null}
             </label>
             <label>
               Доставка

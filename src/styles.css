@@ -296,6 +296,22 @@ p {
   font-weight: 700;
 }
 
+.inline-action-button {
+  width: fit-content;
+  min-height: 34px;
+  padding: 0 10px;
+  color: #176b4d;
+  background: #ffffff;
+  border: 1px solid #c9ded2;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+.inline-action-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
 .build-card__actions {
   display: flex;
   flex-wrap: wrap;
@@ -459,6 +475,8 @@ textarea:focus {
 
 .finance-section,
 .archive-section,
+.overdue-section,
+.analytics-section,
 .settings-section {
   display: grid;
   gap: 18px;

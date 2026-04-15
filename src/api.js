@@ -111,6 +111,15 @@ export async function fetchBuilds() {
   return request('/api/builds');
 }
 
+export async function fetchExchangeRate() {
+  if (shouldUseAppsScript()) {
+    const data = await appsScriptRequest('exchangeRate');
+    return data.rate;
+  }
+
+  return request('/api/exchange-rate');
+}
+
 export async function createBuild(payload) {
   if (shouldUseAppsScript()) {
     const data = await appsScriptRequest('create', compactBuildPayload(payload));

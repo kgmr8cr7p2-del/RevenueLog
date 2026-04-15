@@ -9,17 +9,21 @@ import {
 } from './api.js';
 import { getNextPcNumber } from '../shared/calculations.js';
 import ArchiveTab from './components/ArchiveTab.jsx';
+import AnalyticsTab from './components/AnalyticsTab.jsx';
 import BuildForm from './components/BuildForm.jsx';
 import BuildsBoard from './components/BuildsBoard.jsx';
 import FinanceTab from './components/FinanceTab.jsx';
+import OverdueTab from './components/OverdueTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
-const REQUIRED_SCHEMA_VERSION = 3;
+const REQUIRED_SCHEMA_VERSION = 4;
 
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
   { id: 'finance', title: 'Расчеты' },
+  { id: 'overdue', title: 'Просрочено' },
+  { id: 'analytics', title: 'Мини-аналитика' },
   { id: 'archive', title: 'Архив' },
   { id: 'settings', title: 'Настройки' }
 ];
@@ -46,7 +50,7 @@ export default function App() {
       setStorage(data.storage || '');
       if (data.storage === 'google-sheets' && data.schemaVersion < REQUIRED_SCHEMA_VERSION) {
         setError(
-          'Google Apps Script еще не обновлен. Архив и новые поля не будут сохраняться, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
+          'Google Apps Script еще не обновлен. Архив, уведомления и автокурс не будут работать, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
         );
       }
     } catch (requestError) {
@@ -202,6 +206,17 @@ export default function App() {
       ) : null}
 
       {!loading && activeTab === 'finance' ? <FinanceTab builds={activeBuilds} /> : null}
+
+      {!loading && activeTab === 'overdue' ? (
+        <OverdueTab
+          builds={activeBuilds}
+          onEdit={openEditBuild}
+          onCopy={openCopyBuild}
+          onArchive={toggleArchive}
+        />
+      ) : null}
+
+      {!loading && activeTab === 'analytics' ? <AnalyticsTab builds={activeBuilds} /> : null}
 
       {!loading && activeTab === 'archive' ? (
         <ArchiveTab
