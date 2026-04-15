@@ -49,6 +49,25 @@ export function getBuildReportDate(build) {
   return build?.paymentDate || build?.receivedDate || build?.createdAt || build?.updatedAt || '';
 }
 
+export function addDaysToDateString(dateValue, days) {
+  const start = toDateInputValue(dateValue);
+  const safeDays = Math.floor(toNumber(days));
+  if (!start || safeDays <= 0) return '';
+
+  const [year, month, day] = start.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + safeDays);
+  return date.toISOString().slice(0, 10);
+}
+
+export function getNextPcNumber(builds) {
+  const maxNumber = (Array.isArray(builds) ? builds : []).reduce((max, build) => {
+    const parsed = Number.parseInt(String(build?.pcNumber || '').replace(/\D+/g, ''), 10);
+    return Number.isFinite(parsed) ? Math.max(max, parsed) : max;
+  }, 0);
+  return String(maxNumber + 1);
+}
+
 export function isBuildOverdue(build, now = new Date()) {
   if (!build?.buildDeadline || build?.status === 'received') return false;
   const deadline = toDate(build.buildDeadline);

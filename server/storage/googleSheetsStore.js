@@ -28,7 +28,13 @@ const HEADER = [
   'shippingDate',
   'receivedDate',
   'buildDeadline',
-  'lastChangedAt'
+  'lastChangedAt',
+  'trackingNumber',
+  'assemblyTermDays',
+  'assemblyStartDate',
+  'archived',
+  'notificationHalfSentAt',
+  'notificationTwoDaysSentAt'
 ];
 
 function quoteSheetName(name) {
@@ -68,7 +74,13 @@ function toRow(item) {
     item.shippingDate,
     item.receivedDate,
     item.buildDeadline,
-    item.lastChangedAt
+    item.lastChangedAt,
+    item.trackingNumber,
+    item.assemblyTermDays,
+    item.assemblyStartDate,
+    item.archived,
+    item.notificationHalfSentAt,
+    item.notificationTwoDaysSentAt
   ];
 }
 
@@ -122,14 +134,14 @@ export async function createGoogleSheetsStore({ spreadsheetId, sheetName }) {
 
     const headerResponse = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${escapedSheetName}!A1:AB1`
+      range: `${escapedSheetName}!A1:AH1`
     });
 
     const currentHeader = headerResponse.data.values?.[0] || [];
     if (HEADER.some((value, index) => currentHeader[index] !== value)) {
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${escapedSheetName}!A1:AB1`,
+        range: `${escapedSheetName}!A1:AH1`,
         valueInputOption: 'RAW',
         requestBody: { values: [HEADER] }
       });
@@ -140,7 +152,7 @@ export async function createGoogleSheetsStore({ spreadsheetId, sheetName }) {
     await ensureSheet();
     const response = await sheets.spreadsheets.values.get({
       spreadsheetId,
-      range: `${escapedSheetName}!A2:AB`
+      range: `${escapedSheetName}!A2:AH`
     });
 
     return response.data.values || [];
@@ -166,7 +178,7 @@ export async function createGoogleSheetsStore({ spreadsheetId, sheetName }) {
       await ensureSheet();
       await sheets.spreadsheets.values.append({
         spreadsheetId,
-        range: `${escapedSheetName}!A:AB`,
+        range: `${escapedSheetName}!A:AH`,
         valueInputOption: 'RAW',
         insertDataOption: 'INSERT_ROWS',
         requestBody: { values: [toRow(item)] }
@@ -182,7 +194,7 @@ export async function createGoogleSheetsStore({ spreadsheetId, sheetName }) {
       const rowNumber = index + 2;
       await sheets.spreadsheets.values.update({
         spreadsheetId,
-        range: `${escapedSheetName}!A${rowNumber}:AB${rowNumber}`,
+        range: `${escapedSheetName}!A${rowNumber}:AH${rowNumber}`,
         valueInputOption: 'RAW',
         requestBody: { values: [toRow(item)] }
       });

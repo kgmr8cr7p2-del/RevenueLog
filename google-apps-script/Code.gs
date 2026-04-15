@@ -47,7 +47,13 @@ const HEADER = [
   'shippingDate',
   'receivedDate',
   'buildDeadline',
-  'lastChangedAt'
+  'lastChangedAt',
+  'trackingNumber',
+  'assemblyTermDays',
+  'assemblyStartDate',
+  'archived',
+  'notificationHalfSentAt',
+  'notificationTwoDaysSentAt'
 ];
 
 function doGet(e) {
@@ -154,7 +160,13 @@ function listBuilds_() {
 
 function createBuild_(payload) {
   const sheet = getSheet_();
-  const item = normalizeBuild_(payload || {}, null);
+  const input = payload || {};
+  const item = normalizeBuild_(
+    Object.assign({}, input, {
+      pcNumber: input.pcNumber || getNextPcNumber_(listBuilds_())
+    }),
+    null
+  );
   sheet.appendRow(toRow_(item));
   return item;
 }
@@ -239,7 +251,13 @@ function toRow_(item) {
     item.shippingDate,
     item.receivedDate,
     item.buildDeadline,
-    item.lastChangedAt
+    item.lastChangedAt,
+    item.trackingNumber || '',
+    item.assemblyTermDays || '',
+    item.assemblyStartDate || '',
+    item.archived === true,
+    item.notificationHalfSentAt || '',
+    item.notificationTwoDaysSentAt || ''
   ];
 }
 
@@ -267,12 +285,23 @@ function normalizeBuild_(input, existing) {
       amount: toNumber_(input.delivery && input.delivery.amount),
       currency: normalizeCurrency_(input.delivery && input.delivery.currency, 'RUB')
     },
+    trackingNumber: String(input.trackingNumber || ''),
     paymentDate: normalizeDate_(input.paymentDate),
     shippingDate: normalizeDate_(input.shippingDate),
     receivedDate: normalizeDate_(input.receivedDate),
     buildDeadline: normalizeDate_(input.buildDeadline),
+    assemblyTermDays: normalizePositiveInteger_(input.assemblyTermDays),
+    assemblyStartDate: normalizeDate_(input.assemblyStartDate),
     lastChangedAt: now,
     telegramId: String(input.telegramId || ''),
+    archived:
+      input.archived === undefined && existing
+        ? existing.archived === true || existing.archived === 'true'
+        : input.archived === true || input.archived === 'true',
+    notificationHalfSentAt:
+      input.notificationHalfSentAt || (existing && existing.notificationHalfSentAt) || '',
+    notificationTwoDaysSentAt:
+      input.notificationTwoDaysSentAt || (existing && existing.notificationTwoDaysSentAt) || '',
     note: String(input.note || '')
   };
 
@@ -280,9 +309,25 @@ function normalizeBuild_(input, existing) {
   if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
   if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
   if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
+  if (normalized.assemblyTermDays && !normalized.assemblyStartDate) {
+    normalized.assemblyStartDate = normalized.paymentDate || normalized.createdAt.slice(0, 10);
+  }
+  if (normalized.assemblyTermDays && !normalized.buildDeadline) {
+    normalized.buildDeadline = formatDateOnly_(
+      addDaysToDate_(parseDateOnly_(normalized.assemblyStartDate || normalized.createdAt), normalized.assemblyTermDays)
+    );
+  }
 
   normalized.totals = calculateTotals_(normalized);
   return normalized;
+}
+
+function getNextPcNumber_(items) {
+  const maxNumber = (Array.isArray(items) ? items : []).reduce((max, item) => {
+    const parsed = parseInt(String((item && item.pcNumber) || '').replace(/\D+/g, ''), 10);
+    return Number.isFinite(parsed) ? Math.max(max, parsed) : max;
+  }, 0);
+  return String(maxNumber + 1);
 }
 
 function normalizeComponents_(components) {
@@ -308,6 +353,33 @@ function normalizeCurrency_(value, fallback) {
 
 function normalizeDate_(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
+
+function normalizePositiveInteger_(value) {
+  const number = Math.floor(toNumber_(value));
+  return number > 0 ? number : '';
+}
+
+function parseDateOnly_(value) {
+  const normalized = normalizeDate_(String(value || '').slice(0, 10));
+  if (!normalized) return null;
+  const parts = normalized.split('-').map(Number);
+  return new Date(parts[0], parts[1] - 1, parts[2]);
+}
+
+function addDaysToDate_(date, days) {
+  if (!date) return null;
+  const next = new Date(date.getTime());
+  next.setDate(next.getDate() + Math.floor(toNumber_(days)));
+  return next;
+}
+
+function formatDateOnly_(date) {
+  if (!date) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function calculateTotals_(build) {
@@ -390,6 +462,131 @@ function toNumber_(value) {
 
 function roundMoney_(value) {
   return Math.round((toNumber_(value) + Number.EPSILON) * 100) / 100;
+}
+
+function checkAssemblyNotifications() {
+  const properties = PropertiesService.getScriptProperties();
+  const botToken = properties.getProperty('BOT_TOKEN');
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  if (!botToken || !trustedUserIds.length) {
+    return { checked: 0, updated: 0, messages: 0 };
+  }
+
+  const sheet = getSheet_();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { checked: 0, updated: 0, messages: 0 };
+
+  const rows = sheet.getRange(2, 1, lastRow - 1, HEADER.length).getValues();
+  const now = new Date();
+  const nowIso = now.toISOString();
+  let checked = 0;
+  let updated = 0;
+  let messages = 0;
+
+  rows.forEach((row, index) => {
+    const item = fromRow_(row);
+    if (!item || item.archived || item.status === 'received') return;
+
+    const termDays = toNumber_(item.assemblyTermDays);
+    if (termDays <= 0) return;
+
+    const startDate = parseDateOnly_(
+      item.assemblyStartDate || item.paymentDate || String(item.createdAt || '').slice(0, 10)
+    );
+    if (!startDate) return;
+
+    const deadline =
+      parseDateOnly_(item.buildDeadline) || addDaysToDate_(startDate, termDays);
+    if (!deadline) return;
+
+    checked += 1;
+    let changed = false;
+    const halfDate = addDaysToDate_(startDate, Math.ceil(termDays / 2));
+    const twoDaysBeforeDeadline = addDaysToDate_(deadline, -2);
+
+    if (halfDate && now.getTime() >= halfDate.getTime() && !item.notificationHalfSentAt) {
+      messages += sendTelegramMessageToTrusted_(
+        buildAssemblyNotificationText_(item, 'half', deadline),
+        properties
+      );
+      item.notificationHalfSentAt = nowIso;
+      changed = true;
+    }
+
+    if (
+      twoDaysBeforeDeadline &&
+      now.getTime() >= twoDaysBeforeDeadline.getTime() &&
+      !item.notificationTwoDaysSentAt
+    ) {
+      messages += sendTelegramMessageToTrusted_(
+        buildAssemblyNotificationText_(item, 'twoDays', deadline),
+        properties
+      );
+      item.notificationTwoDaysSentAt = nowIso;
+      changed = true;
+    }
+
+    if (changed) {
+      item.updatedAt = nowIso;
+      item.lastChangedAt = nowIso;
+      item.buildDeadline = item.buildDeadline || formatDateOnly_(deadline);
+      item.totals = calculateTotals_(item);
+      sheet.getRange(index + 2, 1, 1, HEADER.length).setValues([toRow_(item)]);
+      updated += 1;
+    }
+  });
+
+  return { checked, updated, messages };
+}
+
+function setupAssemblyNotificationTrigger() {
+  ScriptApp.getProjectTriggers().forEach((trigger) => {
+    if (trigger.getHandlerFunction() === 'checkAssemblyNotifications') {
+      ScriptApp.deleteTrigger(trigger);
+    }
+  });
+
+  ScriptApp.newTrigger('checkAssemblyNotifications').timeBased().everyDays(1).atHour(10).create();
+  return 'Assembly notification trigger installed';
+}
+
+function buildAssemblyNotificationText_(item, type, deadline) {
+  const title =
+    type === 'half'
+      ? 'Прошла половина срока сборки'
+      : 'До дедлайна сборки осталось 2 дня';
+  const lines = [
+    title,
+    `ПК: ${item.pcNumber || 'без номера'}`,
+    `Договор: ${item.contractNumber || '-'}`,
+    `Дедлайн: ${formatDateOnly_(deadline) || '-'}`,
+    `Статус: ${item.status || '-'}`
+  ];
+
+  if (item.telegramId) lines.push(`Покупатель: ${item.telegramId}`);
+  if (item.trackingNumber) lines.push(`Трек-номер: ${item.trackingNumber}`);
+  return lines.join('\n');
+}
+
+function sendTelegramMessageToTrusted_(text, properties) {
+  const botToken = properties.getProperty('BOT_TOKEN');
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  let sent = 0;
+
+  trustedUserIds.forEach((chatId) => {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'post',
+      contentType: 'application/json',
+      muteHttpExceptions: true,
+      payload: JSON.stringify({
+        chat_id: chatId,
+        text
+      })
+    });
+    sent += 1;
+  });
+
+  return sent;
 }
 
 function assertTelegramAuth_(initData) {

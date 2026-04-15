@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createBuild, deleteBuild, fetchBuilds, updateBuild, updateBuildStatus } from './api.js';
+import { getNextPcNumber } from '../shared/calculations.js';
+import ArchiveTab from './components/ArchiveTab.jsx';
 import BuildForm from './components/BuildForm.jsx';
 import BuildsBoard from './components/BuildsBoard.jsx';
 import FinanceTab from './components/FinanceTab.jsx';
@@ -9,6 +11,7 @@ import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from '
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
   { id: 'finance', title: 'Расчеты' },
+  { id: 'archive', title: 'Архив' },
   { id: 'settings', title: 'Настройки' }
 ];
 
@@ -22,6 +25,8 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [telegramUser, setTelegramUser] = useState(null);
+  const activeBuilds = builds.filter((build) => !build.archived);
+  const archivedBuilds = builds.filter((build) => build.archived);
 
   async function loadBuilds() {
     setLoading(true);
@@ -44,7 +49,7 @@ export default function App() {
   }, []);
 
   function openNewBuild() {
-    setEditingBuild(null);
+    setEditingBuild({ pcNumber: getNextPcNumber(builds) });
     setIsFormOpen(true);
   }
 
@@ -59,13 +64,18 @@ export default function App() {
     delete copiedBuild.createdAt;
     delete copiedBuild.updatedAt;
     delete copiedBuild.lastChangedAt;
+    delete copiedBuild.notificationHalfSentAt;
+    delete copiedBuild.notificationTwoDaysSentAt;
     copiedBuild.status = 'assembly';
-    copiedBuild.pcNumber = '';
+    copiedBuild.pcNumber = getNextPcNumber(builds);
     copiedBuild.contractNumber = '';
     copiedBuild.paymentDate = '';
     copiedBuild.shippingDate = '';
     copiedBuild.receivedDate = '';
     copiedBuild.buildDeadline = '';
+    copiedBuild.assemblyStartDate = '';
+    copiedBuild.trackingNumber = '';
+    copiedBuild.archived = false;
     setEditingBuild(copiedBuild);
     setIsFormOpen(true);
   }
@@ -99,6 +109,19 @@ export default function App() {
     try {
       const updated = await updateBuildStatus(id, status);
       setBuilds((current) => current.map((build) => (build.id === id ? updated : build)));
+    } catch (requestError) {
+      setBuilds(previous);
+      setError(requestError.message);
+    }
+  }
+
+  async function toggleArchive(build, archived) {
+    const previous = builds;
+    const nextBuild = { ...build, archived };
+    setBuilds((current) => current.map((item) => (item.id === build.id ? nextBuild : item)));
+    try {
+      const updated = await updateBuild(build.id, nextBuild);
+      setBuilds((current) => current.map((item) => (item.id === build.id ? updated : item)));
     } catch (requestError) {
       setBuilds(previous);
       setError(requestError.message);
@@ -148,15 +171,25 @@ export default function App() {
 
       {!loading && activeTab === 'builds' ? (
         <BuildsBoard
-          builds={builds}
+          builds={activeBuilds}
           onAdd={openNewBuild}
           onEdit={openEditBuild}
           onCopy={openCopyBuild}
+          onArchive={toggleArchive}
           onStatusChange={changeStatus}
         />
       ) : null}
 
-      {!loading && activeTab === 'finance' ? <FinanceTab builds={builds} /> : null}
+      {!loading && activeTab === 'finance' ? <FinanceTab builds={activeBuilds} /> : null}
+
+      {!loading && activeTab === 'archive' ? (
+        <ArchiveTab
+          builds={archivedBuilds}
+          onEdit={openEditBuild}
+          onCopy={openCopyBuild}
+          onArchive={toggleArchive}
+        />
+      ) : null}
 
       {!loading && activeTab === 'settings' ? (
         <SettingsTab storage={storage} user={telegramUser} />

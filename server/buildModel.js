@@ -1,5 +1,11 @@
 import crypto from 'node:crypto';
-import { calculateTotals, COMPONENTS, STATUSES, toNumber } from '../shared/calculations.js';
+import {
+  addDaysToDateString,
+  calculateTotals,
+  COMPONENTS,
+  STATUSES,
+  toNumber
+} from '../shared/calculations.js';
 
 const ALLOWED_STATUSES = new Set(STATUSES.map((status) => status.id));
 
@@ -9,6 +15,15 @@ function normalizeCurrency(value, fallback = 'RUB') {
 
 function normalizeDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
+
+function normalizeBoolean(value) {
+  return value === true || value === 'true';
+}
+
+function normalizePositiveInteger(value) {
+  const number = Math.floor(toNumber(value));
+  return number > 0 ? number : '';
 }
 
 function normalizeComponents(inputComponents) {
@@ -54,12 +69,20 @@ export function normalizeBuild(input = {}, existing = {}) {
       amount: toNumber(input.delivery?.amount),
       currency: normalizeCurrency(input.delivery?.currency, 'RUB')
     },
+    trackingNumber: String(input.trackingNumber || ''),
     paymentDate: normalizeDate(input.paymentDate),
     shippingDate: normalizeDate(input.shippingDate),
     receivedDate: normalizeDate(input.receivedDate),
     buildDeadline: normalizeDate(input.buildDeadline),
+    assemblyTermDays: normalizePositiveInteger(input.assemblyTermDays),
+    assemblyStartDate: normalizeDate(input.assemblyStartDate),
     lastChangedAt: now,
     telegramId: String(input.telegramId || ''),
+    archived:
+      input.archived === undefined ? normalizeBoolean(existing.archived) : normalizeBoolean(input.archived),
+    notificationHalfSentAt: input.notificationHalfSentAt || existing.notificationHalfSentAt || '',
+    notificationTwoDaysSentAt:
+      input.notificationTwoDaysSentAt || existing.notificationTwoDaysSentAt || '',
     note: String(input.note || '')
   };
 
@@ -67,6 +90,15 @@ export function normalizeBuild(input = {}, existing = {}) {
   if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
   if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
   if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
+  if (normalized.assemblyTermDays && !normalized.assemblyStartDate) {
+    normalized.assemblyStartDate = normalized.paymentDate || normalized.createdAt.slice(0, 10);
+  }
+  if (normalized.assemblyTermDays && !normalized.buildDeadline) {
+    normalized.buildDeadline = addDaysToDateString(
+      normalized.assemblyStartDate || normalized.paymentDate || normalized.createdAt,
+      normalized.assemblyTermDays
+    );
+  }
 
   return {
     ...normalized,

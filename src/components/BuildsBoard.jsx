@@ -26,7 +26,7 @@ function matchesFilters(build, filters) {
   return true;
 }
 
-export default function BuildsBoard({ builds, onEdit, onCopy, onAdd, onStatusChange }) {
+export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, onStatusChange }) {
   const [draggedId, setDraggedId] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const filteredBuilds = useMemo(
@@ -119,6 +119,7 @@ export default function BuildsBoard({ builds, onEdit, onCopy, onAdd, onStatusCha
                     build={build}
                     onEdit={onEdit}
                     onCopy={onCopy}
+                    onArchive={onArchive}
                     onDragStart={(event, id) => {
                       event.dataTransfer.effectAllowed = 'move';
                       setDraggedId(id);

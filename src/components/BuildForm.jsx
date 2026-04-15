@@ -3,6 +3,7 @@ import {
   ACCOUNT_PRICES_USD,
   COMPONENTS,
   STATUSES,
+  addDaysToDateString,
   calculateTotals,
   formatRub,
   formatUsd,
@@ -26,12 +27,16 @@ function createEmptyBuild() {
     fsmSubscriptionUsd: '',
     paid: { amount: '', currency: 'RUB', exchangeRate: '' },
     delivery: { amount: '', currency: 'RUB' },
+    trackingNumber: '',
     paymentDate: '',
     shippingDate: '',
     receivedDate: '',
     buildDeadline: '',
+    assemblyTermDays: '',
+    assemblyStartDate: '',
     lastChangedAt: '',
     telegramId: '',
+    archived: false,
     note: ''
   };
 }
@@ -65,6 +70,7 @@ function normalizeForForm(build) {
     shippingDate: toDateInputValue(build.shippingDate),
     receivedDate: toDateInputValue(build.receivedDate),
     buildDeadline: toDateInputValue(build.buildDeadline),
+    assemblyStartDate: toDateInputValue(build.assemblyStartDate),
     lastChangedAt: build.lastChangedAt || build.updatedAt || ''
   };
 }
@@ -104,7 +110,11 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
 
   function submit(event) {
     event.preventDefault();
-    onSave({ ...form, totals });
+    const buildDeadline =
+      form.buildDeadline ||
+      addDaysToDateString(form.assemblyStartDate || form.paymentDate, form.assemblyTermDays);
+    const payload = { ...form, buildDeadline };
+    onSave({ ...payload, totals: calculateTotals(payload) });
   }
 
   return (
@@ -286,6 +296,14 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
                 placeholder="@username или 123456789"
               />
             </label>
+            <label>
+              Трек-номер доставки
+              <input
+                value={form.trackingNumber}
+                onChange={(event) => updateField('trackingNumber', event.target.value)}
+                placeholder="Например: CDEK123456"
+              />
+            </label>
           </div>
           <label className="wide-label">
             Заметка
@@ -330,6 +348,25 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
                 type="date"
                 value={form.buildDeadline}
                 onChange={(event) => updateField('buildDeadline', event.target.value)}
+              />
+            </label>
+            <label>
+              Дата начала сборки
+              <input
+                type="date"
+                value={form.assemblyStartDate}
+                onChange={(event) => updateField('assemblyStartDate', event.target.value)}
+              />
+            </label>
+            <label>
+              Срок сборки, дней
+              <input
+                type="number"
+                min="0"
+                step="1"
+                value={form.assemblyTermDays}
+                onChange={(event) => updateField('assemblyTermDays', event.target.value)}
+                placeholder="Например: 10"
               />
             </label>
             <label>

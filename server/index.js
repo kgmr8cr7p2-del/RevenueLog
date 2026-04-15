@@ -3,6 +3,7 @@ import cors from 'cors';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getNextPcNumber } from '../shared/calculations.js';
 import { buildSummary, normalizeBuild } from './buildModel.js';
 import { createStore } from './storage/index.js';
 import { telegramAuthMiddleware } from './telegram.js';
@@ -42,7 +43,11 @@ app.get('/api/builds', async (req, res, next) => {
 
 app.post('/api/builds', async (req, res, next) => {
   try {
-    const item = normalizeBuild(req.body);
+    const items = await store.list();
+    const item = normalizeBuild({
+      ...req.body,
+      pcNumber: req.body.pcNumber || getNextPcNumber(items)
+    });
     const created = await store.create(item);
     res.status(201).json(created);
   } catch (error) {

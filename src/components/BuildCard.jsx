@@ -1,15 +1,15 @@
 import { formatRub, isBuildOverdue, toNumber } from '../../shared/calculations.js';
 import { getTelegramLink } from '../telegram.js';
 
-export default function BuildCard({ build, onEdit, onCopy, onDragStart }) {
+export default function BuildCard({ build, onEdit, onCopy, onArchive, onDragStart }) {
   const telegramLink = getTelegramLink(build.telegramId);
   const overdue = isBuildOverdue(build);
 
   return (
     <article
       className="build-card"
-      draggable
-      onDragStart={(event) => onDragStart(event, build.id)}
+      draggable={Boolean(onDragStart)}
+      onDragStart={(event) => onDragStart?.(event, build.id)}
       onClick={() => onEdit(build)}
     >
       <div className="build-card__header">
@@ -27,6 +27,12 @@ export default function BuildCard({ build, onEdit, onCopy, onDragStart }) {
           Дедлайн: {build.buildDeadline}
         </span>
       ) : null}
+      {build.assemblyTermDays ? (
+        <span className="deadline">Срок сборки: {build.assemblyTermDays} дн.</span>
+      ) : null}
+      {build.trackingNumber ? (
+        <span className="deadline">Трек-номер: {build.trackingNumber}</span>
+      ) : null}
       {build.lastChangedAt || build.updatedAt ? (
         <span className="deadline">
           Изменено: {new Date(build.lastChangedAt || build.updatedAt).toLocaleString('ru-RU')}
@@ -42,16 +48,32 @@ export default function BuildCard({ build, onEdit, onCopy, onDragStart }) {
         </a>
       ) : null}
       {build.note ? <p>{build.note}</p> : null}
-      <button
-        type="button"
-        className="copy-button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onCopy(build);
-        }}
-      >
-        Копировать
-      </button>
+      <div className="build-card__actions">
+        {onCopy ? (
+          <button
+            type="button"
+            className="copy-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onCopy(build);
+            }}
+          >
+            Копировать
+          </button>
+        ) : null}
+        {onArchive ? (
+          <button
+            type="button"
+            className="copy-button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onArchive(build, !build.archived);
+            }}
+          >
+            {build.archived ? 'Вернуть' : 'В архив'}
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 }
