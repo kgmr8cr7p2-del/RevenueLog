@@ -6,6 +6,7 @@ import {
   calculateTotals,
   formatRub,
   formatUsd,
+  toDateInputValue,
   toNumber
 } from '../../shared/calculations.js';
 import SummaryCard from './SummaryCard.jsx';
@@ -25,6 +26,11 @@ function createEmptyBuild() {
     fsmSubscriptionUsd: '',
     paid: { amount: '', currency: 'RUB', exchangeRate: '' },
     delivery: { amount: '', currency: 'RUB' },
+    paymentDate: '',
+    shippingDate: '',
+    receivedDate: '',
+    buildDeadline: '',
+    lastChangedAt: '',
     telegramId: '',
     note: ''
   };
@@ -54,7 +60,12 @@ function normalizeForForm(build) {
     delivery: {
       amount: build.delivery?.amount ?? '',
       currency: build.delivery?.currency || 'RUB'
-    }
+    },
+    paymentDate: toDateInputValue(build.paymentDate),
+    shippingDate: toDateInputValue(build.shippingDate),
+    receivedDate: toDateInputValue(build.receivedDate),
+    buildDeadline: toDateInputValue(build.buildDeadline),
+    lastChangedAt: build.lastChangedAt || build.updatedAt || ''
   };
 }
 
@@ -284,6 +295,48 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
               rows="4"
             />
           </label>
+        </section>
+
+        <section className="form-section">
+          <h3>Даты</h3>
+          <div className="form-grid">
+            <label>
+              Дата оплаты
+              <input
+                type="date"
+                value={form.paymentDate}
+                onChange={(event) => updateField('paymentDate', event.target.value)}
+              />
+            </label>
+            <label>
+              Дата отправки
+              <input
+                type="date"
+                value={form.shippingDate}
+                onChange={(event) => updateField('shippingDate', event.target.value)}
+              />
+            </label>
+            <label>
+              Дата получения
+              <input
+                type="date"
+                value={form.receivedDate}
+                onChange={(event) => updateField('receivedDate', event.target.value)}
+              />
+            </label>
+            <label>
+              Дедлайн сборки
+              <input
+                type="date"
+                value={form.buildDeadline}
+                onChange={(event) => updateField('buildDeadline', event.target.value)}
+              />
+            </label>
+            <label>
+              Последнее изменение
+              <input value={form.lastChangedAt ? new Date(form.lastChangedAt).toLocaleString('ru-RU') : ''} readOnly />
+            </label>
+          </div>
         </section>
 
         {needsExchangeRate ? (

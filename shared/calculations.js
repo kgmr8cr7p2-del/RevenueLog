@@ -22,6 +22,41 @@ export const ACCOUNT_PRICES_USD = {
   manual: 15.5
 };
 
+export function getStatusTitle(statusId) {
+  return STATUSES.find((status) => status.id === statusId)?.title || statusId || '';
+}
+
+export function toDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+export function toDateInputValue(value) {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return String(value);
+  const date = toDate(value);
+  return date ? date.toISOString().slice(0, 10) : '';
+}
+
+export function isCurrentMonth(value, now = new Date()) {
+  const date = toDate(value);
+  if (!date) return false;
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
+}
+
+export function getBuildReportDate(build) {
+  return build?.paymentDate || build?.receivedDate || build?.createdAt || build?.updatedAt || '';
+}
+
+export function isBuildOverdue(build, now = new Date()) {
+  if (!build?.buildDeadline || build?.status === 'received') return false;
+  const deadline = toDate(build.buildDeadline);
+  if (!deadline) return false;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return deadline < today;
+}
+
 export function toNumber(value) {
   if (value === null || value === undefined || value === '') return 0;
   const normalized = String(value).replace(',', '.').trim();

@@ -7,6 +7,10 @@ function normalizeCurrency(value, fallback = 'RUB') {
   return value === 'USD' ? 'USD' : fallback;
 }
 
+function normalizeDate(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
+}
+
 function normalizeComponents(inputComponents) {
   const inputByKey = new Map(
     (Array.isArray(inputComponents) ? inputComponents : []).map((component) => [
@@ -50,9 +54,19 @@ export function normalizeBuild(input = {}, existing = {}) {
       amount: toNumber(input.delivery?.amount),
       currency: normalizeCurrency(input.delivery?.currency, 'RUB')
     },
+    paymentDate: normalizeDate(input.paymentDate),
+    shippingDate: normalizeDate(input.shippingDate),
+    receivedDate: normalizeDate(input.receivedDate),
+    buildDeadline: normalizeDate(input.buildDeadline),
+    lastChangedAt: now,
     telegramId: String(input.telegramId || ''),
     note: String(input.note || '')
   };
+
+  const today = now.slice(0, 10);
+  if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
+  if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
+  if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
 
   return {
     ...normalized,

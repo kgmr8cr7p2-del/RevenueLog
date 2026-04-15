@@ -42,7 +42,12 @@ const HEADER = [
   'note',
   'createdAt',
   'updatedAt',
-  'json'
+  'json',
+  'paymentDate',
+  'shippingDate',
+  'receivedDate',
+  'buildDeadline',
+  'lastChangedAt'
 ];
 
 function doGet(e) {
@@ -229,7 +234,12 @@ function toRow_(item) {
     item.note,
     item.createdAt,
     item.updatedAt,
-    JSON.stringify(item)
+    JSON.stringify(item),
+    item.paymentDate,
+    item.shippingDate,
+    item.receivedDate,
+    item.buildDeadline,
+    item.lastChangedAt
   ];
 }
 
@@ -257,9 +267,19 @@ function normalizeBuild_(input, existing) {
       amount: toNumber_(input.delivery && input.delivery.amount),
       currency: normalizeCurrency_(input.delivery && input.delivery.currency, 'RUB')
     },
+    paymentDate: normalizeDate_(input.paymentDate),
+    shippingDate: normalizeDate_(input.shippingDate),
+    receivedDate: normalizeDate_(input.receivedDate),
+    buildDeadline: normalizeDate_(input.buildDeadline),
+    lastChangedAt: now,
     telegramId: String(input.telegramId || ''),
     note: String(input.note || '')
   };
+
+  const today = now.slice(0, 10);
+  if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
+  if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
+  if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
 
   normalized.totals = calculateTotals_(normalized);
   return normalized;
@@ -284,6 +304,10 @@ function normalizeComponents_(components) {
 
 function normalizeCurrency_(value, fallback) {
   return value === 'USD' ? 'USD' : fallback;
+}
+
+function normalizeDate_(value) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')) ? String(value) : '';
 }
 
 function calculateTotals_(build) {

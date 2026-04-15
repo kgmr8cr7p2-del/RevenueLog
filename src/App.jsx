@@ -53,6 +53,23 @@ export default function App() {
     setIsFormOpen(true);
   }
 
+  function openCopyBuild(build) {
+    const copiedBuild = structuredClone(build);
+    delete copiedBuild.id;
+    delete copiedBuild.createdAt;
+    delete copiedBuild.updatedAt;
+    delete copiedBuild.lastChangedAt;
+    copiedBuild.status = 'assembly';
+    copiedBuild.pcNumber = '';
+    copiedBuild.contractNumber = '';
+    copiedBuild.paymentDate = '';
+    copiedBuild.shippingDate = '';
+    copiedBuild.receivedDate = '';
+    copiedBuild.buildDeadline = '';
+    setEditingBuild(copiedBuild);
+    setIsFormOpen(true);
+  }
+
   async function saveBuild(payload) {
     setSaving(true);
     setError('');
@@ -131,6 +148,7 @@ export default function App() {
           builds={builds}
           onAdd={openNewBuild}
           onEdit={openEditBuild}
+          onCopy={openCopyBuild}
           onStatusChange={changeStatus}
         />
       ) : null}

@@ -12,6 +12,11 @@
 - Перетаскивание карточек между колонками.
 - Форма ПК с комплектующими, ценами, аккаунтами, FSM, оплатой, доставкой, Telegram ID и заметкой.
 - Расчет расходов и прибыли в рублях и долларах.
+- Фильтры по номеру ПК, договору, Telegram ID и статусу.
+- Экспорт CSV/XLS: все сборки, текущий месяц, завершенные сборки.
+- Дашборд: статусы, прибыль за месяц, средняя прибыль и зависшие заказы.
+- Даты: оплата, отправка, получение, дедлайн сборки, последнее изменение.
+- Копирование сборки в новую карточку.
 - Google Apps Script для таблицы:
   `https://docs.google.com/spreadsheets/d/1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs/edit`
 
@@ -30,6 +35,8 @@ REQUIRE_TELEGRAM_AUTH=false
 TRUSTED_TELEGRAM_USER_IDS=123456789,987654321
 ```
 
+Зависший заказ считается так: у сборки указан `buildDeadline`, этот дедлайн уже прошел, а статус еще не `Покупатель получил`.
+
 `TRUSTED_TELEGRAM_USER_IDS` — это список Telegram user ID, которым разрешен доступ. Можно указать один ID или несколько через запятую, пробел или с новой строки.
 
 На первом запуске можно оставить `REQUIRE_TELEGRAM_AUTH=false`, чтобы проверить сайт в браузере. Если заполнен `TRUSTED_TELEGRAM_USER_IDS`, Apps Script все равно потребует Telegram-авторизацию и пустит только указанные ID.
@@ -41,6 +48,39 @@ TRUSTED_TELEGRAM_USER_IDS=123456789,987654321
 11. Нажмите `Deploy` и скопируйте Web app URL, который заканчивается на `/exec`.
 
 При первом запросе скрипт создаст лист `PC Builds` и заполнит заголовки.
+
+Лист должен называться `PC Builds`. Столбцы создаются автоматически. Если создаете вручную, порядок такой:
+
+```text
+id
+status
+pcNumber
+contractNumber
+componentsTotalRub
+accountsManual
+accountsAuto
+accountsCostUsd
+fsmSubscriptionUsd
+paidAmount
+paidCurrency
+exchangeRate
+deliveryAmount
+deliveryCurrency
+expensesRub
+expensesUsd
+profitRub
+profitUsd
+telegramId
+note
+createdAt
+updatedAt
+json
+paymentDate
+shippingDate
+receivedDate
+buildDeadline
+lastChangedAt
+```
 
 ## Подключение Apps Script к сайту
 

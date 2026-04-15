@@ -1,8 +1,9 @@
-import { formatRub, toNumber } from '../../shared/calculations.js';
+import { formatRub, isBuildOverdue, toNumber } from '../../shared/calculations.js';
 import { getTelegramLink } from '../telegram.js';
 
-export default function BuildCard({ build, onEdit, onDragStart }) {
+export default function BuildCard({ build, onEdit, onCopy, onDragStart }) {
   const telegramLink = getTelegramLink(build.telegramId);
+  const overdue = isBuildOverdue(build);
 
   return (
     <article
@@ -21,6 +22,16 @@ export default function BuildCard({ build, onEdit, onDragStart }) {
           Прибыль: {formatRub(build.totals?.profitRub)}
         </span>
       </div>
+      {build.buildDeadline ? (
+        <span className={overdue ? 'deadline-bad' : 'deadline'}>
+          Дедлайн: {build.buildDeadline}
+        </span>
+      ) : null}
+      {build.lastChangedAt || build.updatedAt ? (
+        <span className="deadline">
+          Изменено: {new Date(build.lastChangedAt || build.updatedAt).toLocaleString('ru-RU')}
+        </span>
+      ) : null}
       {telegramLink ? (
         <a
           className="telegram-link"
@@ -31,6 +42,16 @@ export default function BuildCard({ build, onEdit, onDragStart }) {
         </a>
       ) : null}
       {build.note ? <p>{build.note}</p> : null}
+      <button
+        type="button"
+        className="copy-button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onCopy(build);
+        }}
+      >
+        Копировать
+      </button>
     </article>
   );
 }

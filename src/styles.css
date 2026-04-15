@@ -161,6 +161,31 @@ p {
   padding-bottom: 8px;
 }
 
+.filters-panel,
+.export-panel {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px solid #dfe6dc;
+  border-radius: 8px;
+}
+
+.export-panel {
+  grid-template-columns: minmax(220px, 1fr) 2fr;
+  align-items: center;
+}
+
+.export-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .kanban-column {
   min-height: 420px;
   background: #ffffff;
@@ -238,6 +263,28 @@ p {
   width: fit-content;
   color: #176b4d;
   text-decoration: none;
+  font-weight: 700;
+}
+
+.deadline,
+.deadline-bad {
+  color: #607066;
+  font-size: 0.85rem;
+}
+
+.deadline-bad {
+  color: #b43b3b;
+  font-weight: 700;
+}
+
+.copy-button {
+  width: fit-content;
+  min-height: 34px;
+  padding: 0 10px;
+  color: #176b4d;
+  background: #e8f3ed;
+  border: 1px solid #c9ded2;
+  border-radius: 8px;
   font-weight: 700;
 }
 
@@ -419,6 +466,10 @@ textarea:focus {
   border-bottom: 1px solid #e7ede4;
 }
 
+.finance-row--wide {
+  grid-template-columns: 1fr 1.1fr 1fr 1fr 1.3fr;
+}
+
 .finance-row:last-child {
   border-bottom: 0;
 }
@@ -464,9 +515,15 @@ textarea:focus {
   }
 
   .form-grid,
+  .filters-panel,
+  .export-panel,
   .calculation-strip,
   .summary-grid {
     grid-template-columns: 1fr;
+  }
+
+  .export-actions {
+    justify-content: flex-start;
   }
 
   .component-row {
