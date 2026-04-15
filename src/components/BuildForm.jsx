@@ -76,6 +76,19 @@ function normalizeForForm(build) {
   };
 }
 
+function formatRateMessage(rate) {
+  const valuesText = (rate.values || [])
+    .map((item) => `${item.label}: ${item.value} ₽`)
+    .join('; ');
+  const fetchedAt = rate.fetchedAt
+    ? new Date(rate.fetchedAt).toLocaleString('ru-RU')
+    : new Date().toLocaleString('ru-RU');
+  const fallbackText = rate.fallbackReason ? ` ${rate.fallbackReason}.` : '';
+  const detailsText = valuesText ? ` Текущие значения: ${valuesText}.` : '';
+
+  return `${rate.source}: среднее ${rate.value} ₽.${detailsText} ${fetchedAt}.${fallbackText}`;
+}
+
 export default function BuildForm({ build, onClose, onSave, onDelete, saving }) {
   const [form, setForm] = useState(() => normalizeForForm(build));
   const [rateLoading, setRateLoading] = useState(false);
@@ -117,9 +130,7 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
     try {
       const rate = await fetchExchangeRate();
       updateField('paid.exchangeRate', rate.value);
-      setRateMessage(
-        `Bybit P2P: ${rate.value} ₽, ${new Date(rate.fetchedAt).toLocaleString('ru-RU')}`
-      );
+      setRateMessage(formatRateMessage(rate));
     } catch (error) {
       setRateMessage(error.message || 'Не удалось получить курс');
     } finally {
@@ -292,7 +303,7 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
                 onClick={loadAutomaticRate}
                 disabled={rateLoading}
               >
-                {rateLoading ? 'Загрузка...' : 'Взять с Bybit'}
+                {rateLoading ? 'Загрузка...' : 'Взять курс'}
               </button>
               {rateMessage ? <small>{rateMessage}</small> : null}
             </label>

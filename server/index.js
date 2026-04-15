@@ -15,6 +15,10 @@ const port = Number(process.env.PORT || 3001);
 const store = await createStore();
 const schemaVersion = 4;
 
+function roundRate(value) {
+  return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
+}
+
 async function fetchBybitSellRate() {
   const response = await fetch('https://api2.bybit.com/fiat/otc/item/online', {
     method: 'POST',
@@ -44,16 +48,73 @@ async function fetchBybitSellRate() {
 
   const prices = (data.result?.items || [])
     .map((item) => Number(item.price))
-    .filter((price) => Number.isFinite(price) && price > 0);
+    .filter((price) => Number.isFinite(price) && price > 0)
+    .slice(0, 5);
   if (!prices.length) throw new Error('Bybit rate is empty');
 
+  const value = roundRate(prices.reduce((sum, price) => sum + price, 0) / prices.length);
   return {
-    value: Math.round((prices[0] + Number.EPSILON) * 100) / 100,
+    value,
     source: 'Bybit P2P USDT/RUB',
     side: 'sell',
     fetchedAt: new Date().toISOString(),
-    prices: prices.slice(0, 5).map((price) => Math.round((price + Number.EPSILON) * 100) / 100)
+    prices: prices.map(roundRate),
+    values: prices.map((price, index) => ({
+      label: `Bybit продажа #${index + 1}`,
+      value: roundRate(price)
+    }))
   };
+}
+
+async function fetchOpenMarketRate() {
+  const results = await Promise.allSettled([
+    fetch('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=rub')
+      .then((response) => {
+        if (!response.ok) throw new Error(`CoinGecko returned HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data) => ({
+        label: 'CoinGecko USDT/RUB',
+        value: Number(data.tether?.rub)
+      })),
+    fetch('https://www.cbr-xml-daily.ru/daily_json.js')
+      .then((response) => {
+        if (!response.ok) throw new Error(`CBR returned HTTP ${response.status}`);
+        return response.json();
+      })
+      .then((data) => ({
+        label: 'ЦБ USD/RUB',
+        value: Number(data.Valute?.USD?.Value)
+      }))
+  ]);
+
+  const values = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value)
+    .filter((item) => Number.isFinite(item.value) && item.value > 0)
+    .map((item) => ({ ...item, value: roundRate(item.value) }));
+
+  if (!values.length) throw new Error('Exchange rate is empty');
+
+  return {
+    value: roundRate(values.reduce((sum, item) => sum + item.value, 0) / values.length),
+    source: 'Среднее из браузерных источников',
+    side: 'sell',
+    fetchedAt: new Date().toISOString(),
+    prices: values.map((item) => item.value),
+    values
+  };
+}
+
+async function fetchExchangeRate() {
+  try {
+    return await fetchBybitSellRate();
+  } catch (error) {
+    return {
+      ...(await fetchOpenMarketRate()),
+      fallbackReason: 'Bybit P2P не отдал данные напрямую'
+    };
+  }
 }
 
 app.use(cors());
@@ -85,7 +146,7 @@ app.get('/api/builds', async (req, res, next) => {
 
 app.get('/api/exchange-rate', async (req, res, next) => {
   try {
-    res.json(await fetchBybitSellRate());
+    res.json(await fetchExchangeRate());
   } catch (error) {
     next(error);
   }

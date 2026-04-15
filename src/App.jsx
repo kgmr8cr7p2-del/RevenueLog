@@ -48,7 +48,7 @@ export default function App() {
       setStorage(data.storage || '');
       if (data.storage === 'google-sheets' && data.schemaVersion < REQUIRED_SCHEMA_VERSION) {
         setError(
-          'Google Apps Script еще не обновлен. Архив, уведомления и автокурс не будут работать, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
+          'Google Apps Script еще не обновлен. Архив и уведомления не будут работать, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
         );
       }
     } catch (requestError) {

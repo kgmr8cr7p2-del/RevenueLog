@@ -91,10 +91,6 @@ function route_(action, payload) {
     };
   }
 
-  if (action === 'exchangeRate') {
-    return { rate: fetchBybitSellRate_() };
-  }
-
   if (action === 'create') {
     return { item: createBuild_(payload) };
   }
@@ -501,56 +497,6 @@ function toNumber_(value) {
 
 function roundMoney_(value) {
   return Math.round((toNumber_(value) + Number.EPSILON) * 100) / 100;
-}
-
-function fetchBybitSellRate_() {
-  const response = UrlFetchApp.fetch('https://api2.bybit.com/fiat/otc/item/online', {
-    method: 'post',
-    contentType: 'application/json',
-    muteHttpExceptions: true,
-    headers: {
-      'User-Agent': 'Mozilla/5.0'
-    },
-    payload: JSON.stringify({
-      userId: '',
-      tokenId: 'USDT',
-      currencyId: 'RUB',
-      payment: [],
-      side: '0',
-      size: '10',
-      page: '1',
-      amount: '',
-      authMaker: false,
-      canTrade: false
-    })
-  });
-
-  const code = response.getResponseCode();
-  if (code >= 400) {
-    throw new Error(`Bybit returned HTTP ${code}`);
-  }
-
-  const data = JSON.parse(response.getContentText());
-  if (data.ret_code !== 0 && data.retCode !== 0) {
-    throw new Error(data.ret_msg || data.retMsg || 'Bybit returned an error');
-  }
-
-  const prices = ((data.result && data.result.items) || [])
-    .map((item) => toNumber_(item.price))
-    .filter((price) => price > 0);
-  if (!prices.length) throw new Error('Bybit rate is empty');
-
-  return {
-    value: roundMoney_(prices[0]),
-    source: 'Bybit P2P USDT/RUB',
-    side: 'sell',
-    fetchedAt: new Date().toISOString(),
-    prices: prices.slice(0, 5).map(roundMoney_)
-  };
-}
-
-function authorizeExternalRequests() {
-  return fetchBybitSellRate_();
 }
 
 function checkAssemblyNotifications() {
