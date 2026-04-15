@@ -4,7 +4,7 @@ import BuildForm from './components/BuildForm.jsx';
 import BuildsBoard from './components/BuildsBoard.jsx';
 import FinanceTab from './components/FinanceTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
-import { getTelegramUser, initializeTelegram } from './telegram.js';
+import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
@@ -132,6 +132,9 @@ export default function App() {
             {tab.title}
           </button>
         ))}
+        <button className="fullscreen-tab-button" onClick={requestTelegramFullscreen}>
+          Во весь экран
+        </button>
       </nav>
 
       {error ? (

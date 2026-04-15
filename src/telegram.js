@@ -8,7 +8,25 @@ export function initializeTelegram() {
 
   webApp.ready();
   webApp.expand();
+  requestTelegramFullscreen();
   return webApp;
+}
+
+export function requestTelegramFullscreen() {
+  const webApp = getTelegramWebApp();
+  if (!webApp) return false;
+
+  try {
+    webApp.expand?.();
+    if (typeof webApp.requestFullscreen === 'function' && !webApp.isFullscreen) {
+      webApp.requestFullscreen();
+      return true;
+    }
+  } catch {
+    return false;
+  }
+
+  return false;
 }
 
 export function getTelegramInitData() {

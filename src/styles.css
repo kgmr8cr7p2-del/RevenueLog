@@ -63,6 +63,14 @@ button {
   background: #176b4d;
 }
 
+.tabs .fullscreen-tab-button {
+  margin-left: auto;
+  color: #176b4d;
+  background: #ffffff;
+  border-color: #c9ded2;
+  font-weight: 700;
+}
+
 .section-heading {
   display: flex;
   align-items: flex-end;
