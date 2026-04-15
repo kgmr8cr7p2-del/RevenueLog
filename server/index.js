@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const store = await createStore();
-const schemaVersion = 2;
+const schemaVersion = 3;
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -83,6 +83,26 @@ app.patch('/api/builds/:id/status', async (req, res, next) => {
     }
 
     const item = normalizeBuild({ ...existing, status: req.body.status }, existing);
+    const updated = await store.update(req.params.id, item);
+    res.json(updated);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/builds/:id/archive', async (req, res, next) => {
+  try {
+    const items = await store.list();
+    const existing = items.find((item) => item.id === req.params.id);
+    if (!existing) {
+      res.status(404).json({ error: 'Build not found' });
+      return;
+    }
+
+    const item = normalizeBuild(
+      { ...existing, archived: req.body.archived === true },
+      existing
+    );
     const updated = await store.update(req.params.id, item);
     res.json(updated);
   } catch (error) {

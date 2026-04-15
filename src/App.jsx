@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { createBuild, deleteBuild, fetchBuilds, updateBuild, updateBuildStatus } from './api.js';
+import {
+  createBuild,
+  deleteBuild,
+  fetchBuilds,
+  updateBuild,
+  updateBuildArchive,
+  updateBuildStatus
+} from './api.js';
 import { getNextPcNumber } from '../shared/calculations.js';
 import ArchiveTab from './components/ArchiveTab.jsx';
 import BuildForm from './components/BuildForm.jsx';
@@ -8,7 +15,7 @@ import FinanceTab from './components/FinanceTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
-const REQUIRED_SCHEMA_VERSION = 2;
+const REQUIRED_SCHEMA_VERSION = 3;
 
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
@@ -127,7 +134,7 @@ export default function App() {
     const nextBuild = { ...build, archived };
     setBuilds((current) => current.map((item) => (item.id === build.id ? nextBuild : item)));
     try {
-      const updated = await updateBuild(build.id, nextBuild);
+      const updated = await updateBuildArchive(build.id, archived);
       if (Boolean(updated?.archived) !== archived) {
         setBuilds(previous);
         setError(

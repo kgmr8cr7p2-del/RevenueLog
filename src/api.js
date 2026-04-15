@@ -10,6 +10,26 @@ function shouldUseAppsScript() {
   return getAppsScriptUrl().startsWith('https://script.google.com/');
 }
 
+function compactBuildPayload(build) {
+  if (!build) return build;
+  const {
+    totals,
+    createdAt,
+    updatedAt,
+    lastChangedAt,
+    ...rest
+  } = build;
+
+  return {
+    ...rest,
+    components: (build.components || []).map((component) => ({
+      key: component.key,
+      value: component.value || '',
+      priceRub: component.priceRub ?? ''
+    }))
+  };
+}
+
 function appsScriptRequest(action, payload = null) {
   const callbackName = `__pcBuilds${Date.now()}${Math.random().toString(36).slice(2)}`;
   const url = new URL(getAppsScriptUrl());
@@ -20,8 +40,10 @@ function appsScriptRequest(action, payload = null) {
   if (initData) url.searchParams.set('initData', initData);
   if (payload !== null) url.searchParams.set('payload', JSON.stringify(payload));
 
-  if (url.toString().length > 60000) {
-    return Promise.reject(new Error('Слишком много текста для сохранения через Apps Script'));
+  if (url.toString().length > 7000) {
+    return Promise.reject(
+      new Error('Слишком много текста для сохранения через Apps Script. Сократите заметку или названия комплектующих.')
+    );
   }
 
   return new Promise((resolve, reject) => {
@@ -91,7 +113,7 @@ export async function fetchBuilds() {
 
 export async function createBuild(payload) {
   if (shouldUseAppsScript()) {
-    const data = await appsScriptRequest('create', payload);
+    const data = await appsScriptRequest('create', compactBuildPayload(payload));
     return data.item;
   }
 
@@ -103,7 +125,7 @@ export async function createBuild(payload) {
 
 export async function updateBuild(id, payload) {
   if (shouldUseAppsScript()) {
-    const data = await appsScriptRequest('update', { id, build: payload });
+    const data = await appsScriptRequest('update', { id, build: compactBuildPayload(payload) });
     return data.item;
   }
 
@@ -122,6 +144,18 @@ export async function updateBuildStatus(id, status) {
   return request(`/api/builds/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status })
+  });
+}
+
+export async function updateBuildArchive(id, archived) {
+  if (shouldUseAppsScript()) {
+    const data = await appsScriptRequest('archive', { id, archived });
+    return data.item;
+  }
+
+  return request(`/api/builds/${id}/archive`, {
+    method: 'PATCH',
+    body: JSON.stringify({ archived })
   });
 }
 

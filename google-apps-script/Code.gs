@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs';
 const SHEET_NAME = 'PC Builds';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const STATUSES = ['assembly', 'paid', 'shipping', 'received'];
 const COMPONENTS = [
@@ -97,6 +97,10 @@ function route_(action, payload) {
     return { item: updateStatus_(payload.id, payload.status) };
   }
 
+  if (action === 'archive') {
+    return { item: updateArchive_(payload.id, payload.archived) };
+  }
+
   if (action === 'delete') {
     deleteBuild_(payload.id);
     return { deleted: true };
@@ -191,6 +195,20 @@ function updateStatus_(id, status) {
 
   const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
   const item = normalizeBuild_(Object.assign({}, existing, { status }), existing);
+  sheet.getRange(rowNumber, 1, 1, HEADER.length).setValues([toRow_(item)]);
+  return item;
+}
+
+function updateArchive_(id, archived) {
+  const sheet = getSheet_();
+  const rowNumber = findRowById_(sheet, id);
+  if (!rowNumber) throw new Error('Build not found');
+
+  const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
+  const item = normalizeBuild_(
+    Object.assign({}, existing, { archived: archived === true || archived === 'true' }),
+    existing
+  );
   sheet.getRange(rowNumber, 1, 1, HEADER.length).setValues([toRow_(item)]);
   return item;
 }
