@@ -925,12 +925,55 @@ function verifyTelegramInitData_(initData, botToken) {
     .map((key) => `${key}=${params[key]}`)
     .join('\n');
 
-  const secretKey = Utilities.computeHmacSha256Signature(botToken, 'WebAppData');
+  const secretKey = hmacSha256Bytes_(utf8Bytes_(botToken), utf8Bytes_('WebAppData'));
   const calculatedHash = bytesToHex_(
-    Utilities.computeHmacSha256Signature(dataCheckString, secretKey)
+    hmacSha256Bytes_(utf8Bytes_(dataCheckString), secretKey)
   );
 
   return calculatedHash === receivedHash ? params : null;
+}
+
+function hmacSha256Bytes_(messageBytes, keyBytes) {
+  const blockSize = 64;
+  let normalizedKey = keyBytes.slice();
+
+  if (normalizedKey.length > blockSize) {
+    normalizedKey = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      normalizedKey
+    );
+  }
+
+  while (normalizedKey.length < blockSize) {
+    normalizedKey.push(0);
+  }
+
+  const outerKeyPad = [];
+  const innerKeyPad = [];
+  normalizedKey.forEach((byte) => {
+    const value = byte & 0xff;
+    outerKeyPad.push(toSignedByte_(value ^ 0x5c));
+    innerKeyPad.push(toSignedByte_(value ^ 0x36));
+  });
+
+  const innerHash = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    innerKeyPad.concat(messageBytes)
+  );
+
+  return Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    outerKeyPad.concat(innerHash)
+  );
+}
+
+function utf8Bytes_(value) {
+  return Utilities.newBlob(String(value || '')).getBytes();
+}
+
+function toSignedByte_(value) {
+  const byte = value & 0xff;
+  return byte > 127 ? byte - 256 : byte;
 }
 
 function getTrustedTelegramUserIds_(properties) {
