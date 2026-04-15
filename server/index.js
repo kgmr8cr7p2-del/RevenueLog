@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const store = await createStore();
-const schemaVersion = 4;
+const schemaVersion = 5;
 
 function roundRate(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -93,6 +93,22 @@ app.get('/api/builds', async (req, res, next) => {
 app.get('/api/exchange-rate', async (req, res, next) => {
   try {
     res.json(await fetchExchangeRate());
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/remind-deadlines', async (req, res, next) => {
+  try {
+    const items = await store.list();
+    const assemblyBuilds = items.filter(
+      (item) => item && !item.archived && item.status === 'assembly'
+    );
+    res.json({
+      count: assemblyBuilds.length,
+      messages: 0,
+      localOnly: true
+    });
   } catch (error) {
     next(error);
   }

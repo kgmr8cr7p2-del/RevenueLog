@@ -33,6 +33,17 @@ export default function BuildCard({ build, onEdit, onCopy, onArchive, onDragStar
       {build.trackingNumber ? (
         <span className="deadline">Трек-номер: {build.trackingNumber}</span>
       ) : null}
+      {build.contractFile?.url ? (
+        <a
+          className="telegram-link"
+          href={build.contractFile.url}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          Договор
+        </a>
+      ) : null}
       {build.lastChangedAt || build.updatedAt ? (
         <span className="deadline">
           Изменено: {new Date(build.lastChangedAt || build.updatedAt).toLocaleString('ru-RU')}

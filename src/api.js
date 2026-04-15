@@ -78,6 +78,81 @@ function appsScriptRequest(action, payload = null) {
   });
 }
 
+function appendHiddenField(form, name, value) {
+  const input = document.createElement('input');
+  input.type = 'hidden';
+  input.name = name;
+  input.value = value;
+  form.appendChild(input);
+}
+
+function uploadContractFileViaAppsScript(buildId, file) {
+  if (!file) return Promise.reject(new Error('Выберите файл договора'));
+
+  return new Promise((resolve, reject) => {
+    const messageId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const frameName = `contract-upload-${messageId}`;
+    const iframe = document.createElement('iframe');
+    const form = document.createElement('form');
+    const fileInput = document.createElement('input');
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error('Apps Script не ответил на загрузку файла'));
+    }, 60000);
+
+    function cleanup() {
+      window.clearTimeout(timeout);
+      window.removeEventListener('message', handleMessage);
+      form.remove();
+      iframe.remove();
+    }
+
+    function handleMessage(event) {
+      const data = event.data || {};
+      if (data.source !== 'pc-builds-upload' || data.messageId !== messageId) return;
+      cleanup();
+      if (!data.ok) {
+        reject(new Error(data.error || 'Файл договора не загружен'));
+        return;
+      }
+      resolve(data.item);
+    }
+
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      fileInput.files = transfer.files;
+    } catch (error) {
+      cleanup();
+      reject(new Error('Браузер не смог подготовить файл к загрузке'));
+      return;
+    }
+
+    iframe.name = frameName;
+    iframe.style.display = 'none';
+
+    form.method = 'POST';
+    form.action = getAppsScriptUrl();
+    form.target = frameName;
+    form.enctype = 'multipart/form-data';
+    form.style.display = 'none';
+
+    appendHiddenField(form, 'action', 'uploadContractFile');
+    appendHiddenField(form, 'messageId', messageId);
+    appendHiddenField(form, 'buildId', buildId);
+    appendHiddenField(form, 'initData', getTelegramInitData());
+
+    fileInput.type = 'file';
+    fileInput.name = 'file';
+    form.appendChild(fileInput);
+
+    window.addEventListener('message', handleMessage);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
+  });
+}
+
 async function request(path, options = {}) {
   const response = await fetch(path, {
     ...options,
@@ -182,6 +257,25 @@ export async function fetchBuilds() {
 
 export async function fetchExchangeRate() {
   return fetchBrowserExchangeRate();
+}
+
+export async function sendDeadlineReminders() {
+  if (shouldUseAppsScript()) {
+    const data = await appsScriptRequest('remindDeadlines');
+    return data.result || {};
+  }
+
+  return request('/api/remind-deadlines', {
+    method: 'POST'
+  });
+}
+
+export async function uploadContractFile(buildId, file) {
+  if (shouldUseAppsScript()) {
+    return uploadContractFileViaAppsScript(buildId, file);
+  }
+
+  throw new Error('Загрузка договора доступна только в режиме Google Apps Script');
 }
 
 export async function createBuild(payload) {

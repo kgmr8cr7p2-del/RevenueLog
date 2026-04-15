@@ -79,6 +79,13 @@ button {
   margin-bottom: 18px;
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 h1,
 h2,
 h3,
@@ -134,7 +141,8 @@ p {
   background: #b43b3b;
 }
 
-.error-banner {
+.error-banner,
+.notice-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -147,11 +155,22 @@ p {
   border-radius: 8px;
 }
 
-.error-banner button {
+.notice-banner {
+  color: #176b4d;
+  background: #e8f3ed;
+  border-color: #c9ded2;
+}
+
+.error-banner button,
+.notice-banner button {
   padding: 6px 10px;
   background: #ffffff;
   border: 1px solid #ffc4c4;
   border-radius: 6px;
+}
+
+.notice-banner button {
+  border-color: #c9ded2;
 }
 
 .loading {
@@ -441,6 +460,28 @@ textarea:focus {
   border-radius: 8px;
 }
 
+.file-panel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: #fbfcfa;
+  border: 1px solid #dfe6dc;
+  border-radius: 8px;
+}
+
+.file-panel a {
+  width: fit-content;
+  color: #176b4d;
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.file-panel span,
+.file-panel small {
+  color: #607066;
+}
+
 .calculation-strip,
 .summary-grid {
   display: grid;
@@ -567,6 +608,10 @@ textarea:focus {
   }
 
   .export-actions {
+    justify-content: flex-start;
+  }
+
+  .section-actions {
     justify-content: flex-start;
   }
 

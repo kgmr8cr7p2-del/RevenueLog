@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs';
 const SHEET_NAME = 'PC Builds';
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 const STATUSES = ['assembly', 'paid', 'shipping', 'received'];
 const STATUS_TITLES = {
@@ -60,7 +60,10 @@ const HEADER = [
   'assemblyStartDate',
   'archived',
   'notificationHalfSentAt',
-  'notificationTwoDaysSentAt'
+  'notificationTwoDaysSentAt',
+  'contractFileName',
+  'contractFileUrl',
+  'contractFileId'
 ];
 
 function doGet(e) {
@@ -75,6 +78,24 @@ function doGet(e) {
   } catch (error) {
     return jsonp_(callback, {
       ok: false,
+      error: error && error.message ? error.message : String(error)
+    });
+  }
+}
+
+function doPost(e) {
+  const messageId = e.parameter.messageId || '';
+
+  try {
+    assertTelegramAuth_(e.parameter.initData || '');
+    const action = e.parameter.action || '';
+    if (action !== 'uploadContractFile') throw new Error('Unknown POST action');
+    const item = uploadContractFile_(e);
+    return postMessageResponse_({ ok: true, item, messageId });
+  } catch (error) {
+    return postMessageResponse_({
+      ok: false,
+      messageId,
       error: error && error.message ? error.message : String(error)
     });
   }
@@ -107,12 +128,25 @@ function route_(action, payload) {
     return { item: updateArchive_(payload.id, payload.archived) };
   }
 
+  if (action === 'remindDeadlines') {
+    return { result: remindDeadlines_() };
+  }
+
   if (action === 'delete') {
     deleteBuild_(payload.id);
     return { deleted: true };
   }
 
   throw new Error('Unknown action');
+}
+
+function postMessageResponse_(data) {
+  const payload = JSON.stringify(
+    Object.assign({ source: 'pc-builds-upload' }, data)
+  ).replace(/</g, '\\u003c');
+  return HtmlService.createHtmlOutput(
+    `<!doctype html><meta charset="utf-8"><script>window.parent.postMessage(${payload}, '*');</script>`
+  ).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function jsonp_(callback, data) {
@@ -228,6 +262,60 @@ function deleteBuild_(id) {
   sheet.deleteRow(rowNumber);
 }
 
+function uploadContractFile_(e) {
+  const buildId = String(e.parameter.buildId || '');
+  if (!buildId) throw new Error('Build ID is required');
+
+  const fileBlob = e.parameter.file;
+  if (!fileBlob || typeof fileBlob.getName !== 'function') {
+    throw new Error('Файл договора не получен');
+  }
+
+  const sheet = getSheet_();
+  const rowNumber = findRowById_(sheet, buildId);
+  if (!rowNumber) throw new Error('Build not found');
+
+  const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
+  const folder = getContractFilesFolder_();
+  const originalName = fileBlob.getName() || 'contract';
+  if (!/\.(pdf|doc|docx)$/i.test(originalName)) {
+    throw new Error('Можно загрузить только PDF, DOC или DOCX');
+  }
+  const pcNumber = existing && existing.pcNumber ? existing.pcNumber : 'без номера';
+  const contractNumber =
+    existing && existing.contractNumber ? existing.contractNumber : 'без договора';
+  const safeName = `ПК ${pcNumber} - договор ${contractNumber} - ${originalName}`;
+  const file = folder.createFile(fileBlob).setName(safeName);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  const contractFile = {
+    id: file.getId(),
+    name: file.getName(),
+    url: file.getUrl(),
+    uploadedAt: new Date().toISOString()
+  };
+  const item = normalizeBuild_(Object.assign({}, existing, { contractFile }), existing);
+  sheet.getRange(rowNumber, 1, 1, HEADER.length).setValues([toRow_(item)]);
+  return item;
+}
+
+function getContractFilesFolder_() {
+  const properties = PropertiesService.getScriptProperties();
+  const savedFolderId = properties.getProperty('CONTRACT_FILES_FOLDER_ID');
+
+  if (savedFolderId) {
+    try {
+      return DriveApp.getFolderById(savedFolderId);
+    } catch (error) {
+      properties.deleteProperty('CONTRACT_FILES_FOLDER_ID');
+    }
+  }
+
+  const folder = DriveApp.createFolder('RevenueLog Contracts');
+  properties.setProperty('CONTRACT_FILES_FOLDER_ID', folder.getId());
+  return folder;
+}
+
 function findRowById_(sheet, id) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return 0;
@@ -250,6 +338,14 @@ function fromRow_(row) {
       if (value === '' || value === undefined || item[key] !== undefined) return;
       item[key] = key === 'archived' ? value === true || value === 'TRUE' || value === 'true' : value;
     });
+    if (!item.contractFile) {
+      const contractFile = normalizeContractFile_({
+        name: row[HEADER.indexOf('contractFileName')],
+        url: row[HEADER.indexOf('contractFileUrl')],
+        id: row[HEADER.indexOf('contractFileId')]
+      });
+      if (contractFile) item.contractFile = contractFile;
+    }
     if (item.archived === undefined) item.archived = false;
     return item;
   } catch (error) {
@@ -258,6 +354,7 @@ function fromRow_(row) {
 }
 
 function toRow_(item) {
+  const contractFile = item.contractFile || {};
   return [
     item.id,
     item.status,
@@ -292,7 +389,10 @@ function toRow_(item) {
     item.assemblyStartDate || '',
     item.archived === true,
     item.notificationHalfSentAt || '',
-    item.notificationTwoDaysSentAt || ''
+    item.notificationTwoDaysSentAt || '',
+    contractFile.name || '',
+    contractFile.url || '',
+    contractFile.id || ''
   ];
 }
 
@@ -337,6 +437,9 @@ function normalizeBuild_(input, existing) {
       input.notificationHalfSentAt || (existing && existing.notificationHalfSentAt) || '',
     notificationTwoDaysSentAt:
       input.notificationTwoDaysSentAt || (existing && existing.notificationTwoDaysSentAt) || '',
+    contractFile: normalizeContractFile_(
+      input.contractFile === undefined ? existing && existing.contractFile : input.contractFile
+    ),
     note: String(input.note || '')
   };
 
@@ -394,6 +497,18 @@ function normalizeDate_(value) {
 function normalizePositiveInteger_(value) {
   const number = Math.floor(toNumber_(value));
   return number > 0 ? number : '';
+}
+
+function normalizeContractFile_(input) {
+  if (!input) return null;
+  const file = {
+    id: String(input.id || ''),
+    name: String(input.name || ''),
+    url: String(input.url || ''),
+    uploadedAt: String(input.uploadedAt || '')
+  };
+
+  return file.id || file.name || file.url ? file : null;
 }
 
 function parseDateOnly_(value) {
@@ -498,6 +613,93 @@ function toNumber_(value) {
 
 function roundMoney_(value) {
   return Math.round((toNumber_(value) + Number.EPSILON) * 100) / 100;
+}
+
+function remindDeadlines_() {
+  const properties = PropertiesService.getScriptProperties();
+  const botToken = properties.getProperty('BOT_TOKEN');
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  if (!botToken) throw new Error('BOT_TOKEN is not configured in Script Properties');
+  if (!trustedUserIds.length) throw new Error('TRUSTED_TELEGRAM_USER_IDS is empty');
+
+  const items = listBuilds_().filter((item) => {
+    return item && !item.archived && item.status === 'assembly';
+  });
+
+  if (!items.length) {
+    const messages = sendTelegramMessageToTrusted_(
+      'Сейчас нет ПК в статусе "Сборка".',
+      properties
+    );
+    return { count: 0, messages };
+  }
+
+  let messages = 0;
+  items.forEach((item) => {
+    const text = buildManualDeadlineReminderText_(item);
+    if (item.contractFile && item.contractFile.id) {
+      messages += sendTelegramDocumentToTrusted_(
+        item.contractFile.id,
+        item.contractFile.name,
+        text,
+        properties
+      );
+    } else {
+      messages += sendTelegramMessageToTrusted_(text, properties);
+    }
+  });
+
+  return { count: items.length, messages };
+}
+
+function buildManualDeadlineReminderText_(item) {
+  const deadline = getBuildDeadlineDate_(item);
+  const remainingText = deadline
+    ? formatRemainingDays_(getCalendarDayDiff_(new Date(), deadline))
+    : 'срок не задан';
+  const lines = [
+    'Напоминание о сроке',
+    `ПК: ${item.pcNumber || 'без номера'}`,
+    `Осталось: ${remainingText}`,
+    `Дедлайн: ${deadline ? formatDateOnly_(deadline) : '-'}`,
+    `Заказчик: ${item.telegramId || '-'}`,
+    `Договор: ${item.contractNumber || '-'}`
+  ];
+
+  if (item.contractFile && item.contractFile.url) {
+    lines.push(`Файл договора: ${item.contractFile.name || 'Открыть'}`);
+    lines.push(item.contractFile.url);
+  } else {
+    lines.push('Файл договора: не прикреплен');
+  }
+
+  return lines.join('\n');
+}
+
+function getBuildDeadlineDate_(item) {
+  const directDeadline = parseDateOnly_(item.buildDeadline);
+  if (directDeadline) return directDeadline;
+
+  const termDays = toNumber_(item.assemblyTermDays);
+  if (termDays <= 0) return null;
+
+  const startDate = parseDateOnly_(
+    item.paymentDate || item.assemblyStartDate || String(item.createdAt || '').slice(0, 10)
+  );
+  return startDate ? addDaysToDate_(startDate, termDays) : null;
+}
+
+function getCalendarDayDiff_(fromDate, toDate) {
+  const from = new Date(fromDate.getFullYear(), fromDate.getMonth(), fromDate.getDate());
+  const to = new Date(toDate.getFullYear(), toDate.getMonth(), toDate.getDate());
+  return Math.round((to.getTime() - from.getTime()) / 86400000);
+}
+
+function formatRemainingDays_(days) {
+  if (days < 0) return `просрочено на ${Math.abs(days)} дн.`;
+  if (days === 0) return 'сегодня последний день';
+  if (days === 1) return 'остался 1 день';
+  return `осталось ${days} дн.`;
 }
 
 function checkAssemblyNotifications() {
@@ -656,6 +858,41 @@ function sendTelegramMessageToTrusted_(text, properties) {
   });
 
   return sent;
+}
+
+function sendTelegramDocumentToTrusted_(fileId, fileName, caption, properties) {
+  const botToken = properties.getProperty('BOT_TOKEN');
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  let documentBlob;
+
+  try {
+    const file = DriveApp.getFileById(fileId);
+    documentBlob = file.getBlob().setName(fileName || file.getName());
+  } catch (error) {
+    return sendTelegramMessageToTrusted_(caption, properties);
+  }
+
+  let sent = 0;
+  trustedUserIds.forEach((chatId) => {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${botToken}/sendDocument`, {
+      method: 'post',
+      muteHttpExceptions: true,
+      payload: {
+        chat_id: chatId,
+        caption: trimTelegramCaption_(caption),
+        document: documentBlob
+      }
+    });
+    sent += 1;
+  });
+
+  return sent;
+}
+
+function trimTelegramCaption_(text) {
+  const value = String(text || '');
+  if (value.length <= 1024) return value;
+  return value.slice(0, 1000) + '\n...';
 }
 
 function assertTelegramAuth_(initData) {

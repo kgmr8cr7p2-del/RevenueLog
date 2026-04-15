@@ -32,7 +32,16 @@ function matchesFilters(build, filters) {
   return true;
 }
 
-export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, onStatusChange }) {
+export default function BuildsBoard({
+  builds,
+  onEdit,
+  onCopy,
+  onArchive,
+  onAdd,
+  onStatusChange,
+  onRemindDeadlines,
+  reminding
+}) {
   const [draggedId, setDraggedId] = useState('');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const filteredBuilds = useMemo(
@@ -58,9 +67,14 @@ export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, 
           <h1>Сборки ПК</h1>
           <p>Перетаскивайте карточку в нужную колонку.</p>
         </div>
-        <button className="primary-button" onClick={onAdd}>
-          Добавить новый ПК
-        </button>
+        <div className="section-actions">
+          <button className="ghost-button" onClick={onRemindDeadlines} disabled={reminding}>
+            {reminding ? 'Отправка...' : 'Напомнить о сроках'}
+          </button>
+          <button className="primary-button" onClick={onAdd}>
+            Добавить новый ПК
+          </button>
+        </div>
       </div>
 
       <section className="filters-panel">

@@ -3,9 +3,11 @@ import {
   createBuild,
   deleteBuild,
   fetchBuilds,
+  sendDeadlineReminders,
   updateBuild,
   updateBuildArchive,
-  updateBuildStatus
+  updateBuildStatus,
+  uploadContractFile
 } from './api.js';
 import { getNextPcNumber } from '../shared/calculations.js';
 import ArchiveTab from './components/ArchiveTab.jsx';
@@ -16,7 +18,7 @@ import FinanceTab from './components/FinanceTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
-const REQUIRED_SCHEMA_VERSION = 4;
+const REQUIRED_SCHEMA_VERSION = 5;
 
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
@@ -34,7 +36,9 @@ export default function App() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [reminding, setReminding] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [telegramUser, setTelegramUser] = useState(null);
   const activeBuilds = builds.filter((build) => !build.archived);
   const archivedBuilds = builds.filter((build) => build.archived);
@@ -48,7 +52,7 @@ export default function App() {
       setStorage(data.storage || '');
       if (data.storage === 'google-sheets' && data.schemaVersion < REQUIRED_SCHEMA_VERSION) {
         setError(
-          'Google Apps Script еще не обновлен. Архив и уведомления не будут работать, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
+          'Google Apps Script еще не обновлен. Файлы договоров и напоминания по срокам не будут работать, пока не вставить свежий Code.gs и не сделать New version -> Deploy.'
         );
       }
     } catch (requestError) {
@@ -82,6 +86,7 @@ export default function App() {
     delete copiedBuild.lastChangedAt;
     delete copiedBuild.notificationHalfSentAt;
     delete copiedBuild.notificationTwoDaysSentAt;
+    delete copiedBuild.contractFile;
     copiedBuild.status = 'assembly';
     copiedBuild.pcNumber = getNextPcNumber(builds);
     copiedBuild.contractNumber = '';
@@ -129,6 +134,33 @@ export default function App() {
       setBuilds(previous);
       setError(requestError.message);
     }
+  }
+
+  async function remindDeadlines() {
+    setReminding(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await sendDeadlineReminders();
+      const count = Number(result.count || 0);
+      const messages = Number(result.messages || 0);
+      setNotice(
+        count > 0
+          ? `Напоминания отправлены: ${count} ПК, сообщений: ${messages}.`
+          : 'В статусе "Сборка" сейчас нет ПК.'
+      );
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setReminding(false);
+    }
+  }
+
+  async function attachContractFile(buildId, file) {
+    const updated = await uploadContractFile(buildId, file);
+    setBuilds((current) => current.map((build) => (build.id === updated.id ? updated : build)));
+    setEditingBuild(updated);
+    return updated;
   }
 
   async function toggleArchive(build, archived) {
@@ -190,6 +222,13 @@ export default function App() {
         </div>
       ) : null}
 
+      {notice ? (
+        <div className="notice-banner">
+          <span>{notice}</span>
+          <button onClick={() => setNotice('')}>OK</button>
+        </div>
+      ) : null}
+
       {loading ? <div className="loading">Загрузка...</div> : null}
 
       {!loading && activeTab === 'builds' ? (
@@ -200,6 +239,8 @@ export default function App() {
           onCopy={openCopyBuild}
           onArchive={toggleArchive}
           onStatusChange={changeStatus}
+          onRemindDeadlines={remindDeadlines}
+          reminding={reminding}
         />
       ) : null}
 
@@ -230,6 +271,7 @@ export default function App() {
           }}
           onSave={saveBuild}
           onDelete={removeBuild}
+          onUploadContractFile={attachContractFile}
         />
       ) : null}
     </main>

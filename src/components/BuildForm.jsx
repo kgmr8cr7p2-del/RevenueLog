@@ -37,6 +37,7 @@ function createEmptyBuild() {
     assemblyStartDate: '',
     lastChangedAt: '',
     telegramId: '',
+    contractFile: null,
     archived: false,
     note: ''
   };
@@ -89,10 +90,12 @@ function formatRateMessage(rate) {
   return `${rate.source}: среднее ${rate.value} ₽.${detailsText} ${fetchedAt}.${fallbackText}`;
 }
 
-export default function BuildForm({ build, onClose, onSave, onDelete, saving }) {
+export default function BuildForm({ build, onClose, onSave, onDelete, onUploadContractFile, saving }) {
   const [form, setForm] = useState(() => normalizeForForm(build));
   const [rateLoading, setRateLoading] = useState(false);
   const [rateMessage, setRateMessage] = useState('');
+  const [fileUploading, setFileUploading] = useState(false);
+  const [fileMessage, setFileMessage] = useState('');
   const totals = useMemo(() => calculateTotals(form), [form]);
   const calculatedDeadline = useMemo(
     () => addDaysToDateString(form.paymentDate, form.assemblyTermDays),
@@ -139,6 +142,32 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
       setRateMessage(error.message || 'Не удалось получить курс');
     } finally {
       setRateLoading(false);
+    }
+  }
+
+  async function uploadContractFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !build?.id || !onUploadContractFile) return;
+    if (!/\.(pdf|doc|docx)$/i.test(file.name)) {
+      setFileMessage('Можно загрузить только PDF, DOC или DOCX.');
+      return;
+    }
+
+    setFileUploading(true);
+    setFileMessage('');
+    try {
+      const updated = await onUploadContractFile(build.id, file);
+      setForm((current) => ({
+        ...current,
+        contractFile: updated.contractFile || null,
+        lastChangedAt: updated.lastChangedAt || current.lastChangedAt
+      }));
+      setFileMessage('Файл договора загружен.');
+    } catch (error) {
+      setFileMessage(error.message || 'Не удалось загрузить файл договора');
+    } finally {
+      setFileUploading(false);
     }
   }
 
@@ -387,6 +416,33 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
               Последнее изменение
               <input value={form.lastChangedAt ? new Date(form.lastChangedAt).toLocaleString('ru-RU') : ''} readOnly />
             </label>
+          </div>
+        </section>
+
+        <section className="form-section">
+          <h3>Файл договора</h3>
+          <div className="file-panel">
+            {form.contractFile?.url ? (
+              <a href={form.contractFile.url} target="_blank" rel="noreferrer">
+                {form.contractFile.name || 'Открыть файл договора'}
+              </a>
+            ) : (
+              <span>Файл договора не прикреплен.</span>
+            )}
+            {isEditing ? (
+              <label>
+                Загрузить PDF или Word
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={uploadContractFile}
+                  disabled={fileUploading}
+                />
+              </label>
+            ) : (
+              <small>Сначала сохраните ПК, потом прикрепите договор.</small>
+            )}
+            {fileMessage ? <small>{fileMessage}</small> : null}
           </div>
         </section>
 

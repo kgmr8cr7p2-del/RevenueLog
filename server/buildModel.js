@@ -26,6 +26,18 @@ function normalizePositiveInteger(value) {
   return number > 0 ? number : '';
 }
 
+function normalizeContractFile(input) {
+  if (!input) return null;
+  const file = {
+    id: String(input.id || ''),
+    name: String(input.name || ''),
+    url: String(input.url || ''),
+    uploadedAt: String(input.uploadedAt || '')
+  };
+
+  return file.id || file.name || file.url ? file : null;
+}
+
 function normalizeComponents(inputComponents) {
   const inputByKey = new Map(
     (Array.isArray(inputComponents) ? inputComponents : []).map((component) => [
@@ -83,6 +95,9 @@ export function normalizeBuild(input = {}, existing = {}) {
     notificationHalfSentAt: input.notificationHalfSentAt || existing.notificationHalfSentAt || '',
     notificationTwoDaysSentAt:
       input.notificationTwoDaysSentAt || existing.notificationTwoDaysSentAt || '',
+    contractFile: normalizeContractFile(
+      input.contractFile === undefined ? existing.contractFile : input.contractFile
+    ),
     note: String(input.note || '')
   };
 
