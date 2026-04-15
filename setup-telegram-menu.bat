@@ -12,14 +12,21 @@ echo.
 echo Settings are saved only in telegram-menu.config.local.bat on this computer.
 echo.
 
-if exist "%CONFIG_FILE%" (
-  set "USE_SAVED=Y"
-  set /p USE_SAVED=Use saved settings? [Y/n]:
-  if /i not "%USE_SAVED%"=="N" (
-    call "%CONFIG_FILE%"
-    set "SAVED_SETTINGS_LOADED=1"
-  )
+if not exist "%CONFIG_FILE%" goto after_saved_config
+
+set "USE_SAVED=Y"
+set /p USE_SAVED=Use saved settings? [Y/n]:
+if /i "%USE_SAVED%"=="N" (
+  set "BOT_TOKEN="
+  set "WEB_APP_URL="
+  set "TRUSTED_TELEGRAM_USER_IDS="
+  set "SAVED_SETTINGS_LOADED="
+) else (
+  call "%CONFIG_FILE%"
+  set "SAVED_SETTINGS_LOADED=1"
 )
+
+:after_saved_config
 
 if "%BOT_TOKEN%"=="" (
   for /f "usebackq delims=" %%A in (`powershell -NoProfile -Command "$s = Read-Host 'Paste Telegram bot token' -AsSecureString; $b = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }"`) do set "BOT_TOKEN=%%A"

@@ -13,7 +13,6 @@ import AnalyticsTab from './components/AnalyticsTab.jsx';
 import BuildForm from './components/BuildForm.jsx';
 import BuildsBoard from './components/BuildsBoard.jsx';
 import FinanceTab from './components/FinanceTab.jsx';
-import OverdueTab from './components/OverdueTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
@@ -22,7 +21,6 @@ const REQUIRED_SCHEMA_VERSION = 4;
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
   { id: 'finance', title: 'Расчеты' },
-  { id: 'overdue', title: 'Просрочено' },
   { id: 'analytics', title: 'Мини-аналитика' },
   { id: 'archive', title: 'Архив' },
   { id: 'settings', title: 'Настройки' }
@@ -206,15 +204,6 @@ export default function App() {
       ) : null}
 
       {!loading && activeTab === 'finance' ? <FinanceTab builds={activeBuilds} /> : null}
-
-      {!loading && activeTab === 'overdue' ? (
-        <OverdueTab
-          builds={activeBuilds}
-          onEdit={openEditBuild}
-          onCopy={openCopyBuild}
-          onArchive={toggleArchive}
-        />
-      ) : null}
 
       {!loading && activeTab === 'analytics' ? <AnalyticsTab builds={activeBuilds} /> : null}
 

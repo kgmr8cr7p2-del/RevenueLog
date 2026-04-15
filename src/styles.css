@@ -162,7 +162,7 @@ p {
 
 .kanban {
   display: grid;
-  grid-template-columns: repeat(4, minmax(260px, 1fr));
+  grid-template-columns: repeat(5, minmax(260px, 1fr));
   gap: 12px;
   align-items: start;
   overflow-x: auto;
@@ -219,6 +219,11 @@ p {
   color: #176b4d;
   background: #e8f3ed;
   border-radius: 8px;
+}
+
+.kanban-column--overdue header span {
+  color: #b43b3b;
+  background: #ffe8e8;
 }
 
 .kanban-column__body {
@@ -550,7 +555,7 @@ textarea:focus {
   }
 
   .kanban {
-    grid-template-columns: repeat(4, minmax(250px, 80vw));
+    grid-template-columns: repeat(5, minmax(250px, 80vw));
   }
 
   .form-grid,

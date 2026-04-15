@@ -1,6 +1,11 @@
 import { useMemo, useState } from 'react';
-import { STATUSES } from '../../shared/calculations.js';
+import { STATUSES, isBuildOverdue } from '../../shared/calculations.js';
 import BuildCard from './BuildCard.jsx';
+
+const BOARD_COLUMNS = [
+  ...STATUSES,
+  { id: 'overdue', title: 'Просрочено', auto: true }
+];
 
 const EMPTY_FILTERS = {
   pcNumber: '',
@@ -21,6 +26,7 @@ function matchesFilters(build, filters) {
   if (pcNumber && !normalizeSearch(build.pcNumber).includes(pcNumber)) return false;
   if (contractNumber && !normalizeSearch(build.contractNumber).includes(contractNumber)) return false;
   if (telegramId && !normalizeSearch(build.telegramId).includes(telegramId)) return false;
+  if (filters.status === 'overdue') return isBuildOverdue(build);
   if (filters.status && build.status !== filters.status) return false;
 
   return true;
@@ -91,6 +97,7 @@ export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, 
                 {status.title}
               </option>
             ))}
+            <option value="overdue">Просрочено</option>
           </select>
         </label>
         <button className="ghost-button" onClick={() => setFilters(EMPTY_FILTERS)}>
@@ -99,14 +106,19 @@ export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, 
       </section>
 
       <div className="kanban">
-        {STATUSES.map((status) => {
-          const items = filteredBuilds.filter((build) => build.status === status.id);
+        {BOARD_COLUMNS.map((status) => {
+          const items = status.auto
+            ? filteredBuilds.filter((build) => isBuildOverdue(build))
+            : filteredBuilds.filter(
+                (build) => build.status === status.id && !isBuildOverdue(build)
+              );
+
           return (
             <section
-              className="kanban-column"
+              className={status.auto ? 'kanban-column kanban-column--overdue' : 'kanban-column'}
               key={status.id}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => handleDrop(event, status.id)}
+              onDragOver={status.auto ? undefined : (event) => event.preventDefault()}
+              onDrop={status.auto ? undefined : (event) => handleDrop(event, status.id)}
             >
               <header>
                 <h2>{status.title}</h2>
@@ -126,7 +138,11 @@ export default function BuildsBoard({ builds, onEdit, onCopy, onArchive, onAdd, 
                     }}
                   />
                 ))}
-                {items.length === 0 ? <div className="empty-column">Пусто</div> : null}
+                {items.length === 0 ? (
+                  <div className="empty-column">
+                    {status.auto ? 'Просроченных нет' : 'Пусто'}
+                  </div>
+                ) : null}
               </div>
             </section>
           );
