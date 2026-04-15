@@ -53,10 +53,10 @@ async function sendStartMessage(chatId) {
   });
 }
 
-async function sendAccessDenied(chatId) {
+async function sendAccessDenied(chatId, userId) {
   await telegram('sendMessage', {
     chat_id: chatId,
-    text: 'Доступ закрыт. Ваш Telegram ID не добавлен в список доверенных пользователей.'
+    text: `Доступ закрыт. Ваш Telegram ID: ${userId || 'неизвестен'}`
   });
 }
 
@@ -77,7 +77,7 @@ async function handleUpdate(update) {
   const message = update.message;
   if (!message?.chat?.id) return;
   if (!isTrustedUser(message.from?.id)) {
-    await sendAccessDenied(message.chat.id);
+    await sendAccessDenied(message.chat.id, message.from?.id);
     return;
   }
 
