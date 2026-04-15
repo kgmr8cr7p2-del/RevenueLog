@@ -37,6 +37,11 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo.
+echo Paste trusted Telegram user IDs separated by comma.
+echo Leave empty only for testing.
+set /p TRUSTED_TELEGRAM_USER_IDS=Trusted user IDs:
+
 if not exist "node_modules" (
   echo.
   echo Installing npm dependencies...
@@ -60,6 +65,7 @@ if "%RESULT%"=="0" (
   echo Failed. Check the error above.
   set "BOT_TOKEN="
   set "WEB_APP_URL="
+  set "TRUSTED_TELEGRAM_USER_IDS="
   pause
   exit /b %RESULT%
 )
@@ -73,5 +79,6 @@ set "RESULT=%ERRORLEVEL%"
 
 set "BOT_TOKEN="
 set "WEB_APP_URL="
+set "TRUSTED_TELEGRAM_USER_IDS="
 pause
 exit /b %RESULT%

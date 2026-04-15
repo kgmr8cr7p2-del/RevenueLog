@@ -1,6 +1,7 @@
 const botToken = process.env.BOT_TOKEN;
 const webAppUrl = process.env.WEB_APP_URL;
 const buttonText = process.env.WEB_APP_BUTTON_TEXT || 'Открыть сборки ПК';
+const trustedUserIds = parseTrustedUserIds(process.env.TRUSTED_TELEGRAM_USER_IDS);
 
 if (!botToken) {
   throw new Error('Set BOT_TOKEN environment variable');
@@ -52,9 +53,33 @@ async function sendStartMessage(chatId) {
   });
 }
 
+async function sendAccessDenied(chatId) {
+  await telegram('sendMessage', {
+    chat_id: chatId,
+    text: 'Доступ закрыт. Ваш Telegram ID не добавлен в список доверенных пользователей.'
+  });
+}
+
+function parseTrustedUserIds(value) {
+  return new Set(
+    String(value || '')
+      .split(/[\s,;]+/)
+      .map((id) => id.trim())
+      .filter(Boolean)
+  );
+}
+
+function isTrustedUser(userId) {
+  return trustedUserIds.size === 0 || trustedUserIds.has(String(userId));
+}
+
 async function handleUpdate(update) {
   const message = update.message;
   if (!message?.chat?.id) return;
+  if (!isTrustedUser(message.from?.id)) {
+    await sendAccessDenied(message.chat.id);
+    return;
+  }
 
   const text = String(message.text || '').trim();
   if (text === '/start' || text.startsWith('/start ')) {
@@ -68,6 +93,9 @@ async function handleUpdate(update) {
 console.log('Bot is running.');
 console.log('Send /start to the bot in Telegram.');
 console.log('Keep this window open while you want the local bot to answer messages.');
+if (trustedUserIds.size > 0) {
+  console.log(`Trusted Telegram users: ${Array.from(trustedUserIds).join(', ')}`);
+}
 
 while (isRunning) {
   try {

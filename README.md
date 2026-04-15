@@ -27,9 +27,12 @@
 ```text
 BOT_TOKEN=токен_бота
 REQUIRE_TELEGRAM_AUTH=false
+TRUSTED_TELEGRAM_USER_IDS=123456789,987654321
 ```
 
-На первом запуске оставьте `REQUIRE_TELEGRAM_AUTH=false`, чтобы проверить сайт в браузере. После настройки Telegram можно поменять на `true`.
+`TRUSTED_TELEGRAM_USER_IDS` — это список Telegram user ID, которым разрешен доступ. Можно указать один ID или несколько через запятую, пробел или с новой строки.
+
+На первом запуске можно оставить `REQUIRE_TELEGRAM_AUTH=false`, чтобы проверить сайт в браузере. Если заполнен `TRUSTED_TELEGRAM_USER_IDS`, Apps Script все равно потребует Telegram-авторизацию и пустит только указанные ID.
 
 7. Нажмите `Deploy -> New deployment`.
 8. Тип: `Web app`.
@@ -79,6 +82,12 @@ npm.cmd run telegram:menu
 Скрипт настроит кнопку меню бота на открытие mini app.
 
 Можно проще: запустите файл `setup-telegram-menu.bat`, вставьте токен бота и HTTPS-ссылку GitHub Pages. Батник настроит кнопку меню, а потом запустит локального Telegram-бота. Окно нужно держать открытым, пока бот должен отвечать на `/start`.
+
+Батник также спросит `Trusted user IDs`. Укажите Telegram user ID людей, которым бот должен отвечать. Пример:
+
+```text
+123456789,987654321
+```
 
 После проверки в Telegram вернитесь в Apps Script и поменяйте:
 

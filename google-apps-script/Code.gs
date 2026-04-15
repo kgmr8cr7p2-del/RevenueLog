@@ -370,22 +370,27 @@ function roundMoney_(value) {
 
 function assertTelegramAuth_(initData) {
   const properties = PropertiesService.getScriptProperties();
-  const requireAuth = properties.getProperty('REQUIRE_TELEGRAM_AUTH') === 'true';
+  const trustedUserIds = getTrustedTelegramUserIds_(properties);
+  const requireAuth =
+    properties.getProperty('REQUIRE_TELEGRAM_AUTH') === 'true' || trustedUserIds.length > 0;
   if (!requireAuth) return;
 
   const botToken = properties.getProperty('BOT_TOKEN');
   if (!botToken) throw new Error('BOT_TOKEN is not configured in Script Properties');
-  if (!verifyTelegramInitData_(initData, botToken)) {
+  const telegramData = verifyTelegramInitData_(initData, botToken);
+  if (!telegramData) {
     throw new Error('Telegram authorization failed');
   }
+
+  assertTrustedTelegramUser_(telegramData, trustedUserIds);
 }
 
 function verifyTelegramInitData_(initData, botToken) {
-  if (!initData || !botToken) return false;
+  if (!initData || !botToken) return null;
 
   const params = parseQueryString_(initData);
   const receivedHash = params.hash;
-  if (!receivedHash) return false;
+  if (!receivedHash) return null;
   delete params.hash;
 
   const dataCheckString = Object.keys(params)
@@ -398,7 +403,35 @@ function verifyTelegramInitData_(initData, botToken) {
     Utilities.computeHmacSha256Signature(dataCheckString, secretKey)
   );
 
-  return calculatedHash === receivedHash;
+  return calculatedHash === receivedHash ? params : null;
+}
+
+function getTrustedTelegramUserIds_(properties) {
+  const raw =
+    properties.getProperty('TRUSTED_TELEGRAM_USER_IDS') ||
+    properties.getProperty('ALLOWED_TELEGRAM_USER_IDS') ||
+    '';
+
+  return String(raw)
+    .split(/[\s,;]+/)
+    .map((id) => id.trim())
+    .filter(Boolean);
+}
+
+function assertTrustedTelegramUser_(telegramData, trustedUserIds) {
+  if (!trustedUserIds.length) return;
+
+  let user = {};
+  try {
+    user = JSON.parse(telegramData.user || '{}');
+  } catch (error) {
+    throw new Error('Telegram user data is invalid');
+  }
+
+  const userId = String(user.id || '');
+  if (!userId || trustedUserIds.indexOf(userId) === -1) {
+    throw new Error('Telegram user is not allowed');
+  }
 }
 
 function parseQueryString_(query) {
