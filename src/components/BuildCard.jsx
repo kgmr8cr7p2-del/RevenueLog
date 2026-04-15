@@ -28,7 +28,7 @@ export default function BuildCard({ build, onEdit, onCopy, onArchive, onDragStar
         </span>
       ) : null}
       {build.assemblyTermDays ? (
-        <span className="deadline">Срок сборки: {build.assemblyTermDays} дн.</span>
+        <span className="deadline">Срок на все: {build.assemblyTermDays} дн.</span>
       ) : null}
       {build.trackingNumber ? (
         <span className="deadline">Трек-номер: {build.trackingNumber}</span>

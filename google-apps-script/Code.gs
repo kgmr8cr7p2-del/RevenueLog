@@ -344,13 +344,14 @@ function normalizeBuild_(input, existing) {
   if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
   if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
   if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
-  if (normalized.assemblyTermDays && !normalized.assemblyStartDate) {
+  if (normalized.assemblyTermDays) {
     normalized.assemblyStartDate = normalized.paymentDate || normalized.createdAt.slice(0, 10);
-  }
-  if (normalized.assemblyTermDays && !normalized.buildDeadline) {
     normalized.buildDeadline = formatDateOnly_(
-      addDaysToDate_(parseDateOnly_(normalized.assemblyStartDate || normalized.createdAt), normalized.assemblyTermDays)
+      addDaysToDate_(parseDateOnly_(normalized.assemblyStartDate), normalized.assemblyTermDays)
     );
+  } else {
+    normalized.assemblyStartDate = normalized.paymentDate || normalized.assemblyStartDate;
+    normalized.buildDeadline = '';
   }
 
   normalized.totals = calculateTotals_(normalized);
@@ -621,8 +622,8 @@ function setupAssemblyNotificationTrigger() {
 function buildAssemblyNotificationText_(item, type, deadline) {
   const title =
     type === 'half'
-      ? 'Прошла половина срока сборки'
-      : 'До дедлайна сборки осталось 2 дня';
+      ? 'Прошла половина срока'
+      : 'До дедлайна осталось 2 дня';
   const lines = [
     title,
     `ПК: ${item.pcNumber || 'без номера'}`,

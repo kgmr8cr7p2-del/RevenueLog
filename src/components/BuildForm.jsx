@@ -94,6 +94,10 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
   const [rateLoading, setRateLoading] = useState(false);
   const [rateMessage, setRateMessage] = useState('');
   const totals = useMemo(() => calculateTotals(form), [form]);
+  const calculatedDeadline = useMemo(
+    () => addDaysToDateString(form.paymentDate, form.assemblyTermDays),
+    [form.paymentDate, form.assemblyTermDays]
+  );
   const isEditing = Boolean(build?.id);
   const needsExchangeRate =
     toNumber(form.paid.exchangeRate) <= 0 &&
@@ -140,10 +144,8 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
 
   function submit(event) {
     event.preventDefault();
-    const buildDeadline =
-      form.buildDeadline ||
-      addDaysToDateString(form.assemblyStartDate || form.paymentDate, form.assemblyTermDays);
-    const payload = { ...form, buildDeadline };
+    const buildDeadline = addDaysToDateString(form.paymentDate, form.assemblyTermDays);
+    const payload = { ...form, assemblyStartDate: form.paymentDate, buildDeadline };
     onSave({ ...payload, totals: calculateTotals(payload) });
   }
 
@@ -366,39 +368,7 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
               />
             </label>
             <label>
-              Дата отправки
-              <input
-                type="date"
-                value={form.shippingDate}
-                onChange={(event) => updateField('shippingDate', event.target.value)}
-              />
-            </label>
-            <label>
-              Дата получения
-              <input
-                type="date"
-                value={form.receivedDate}
-                onChange={(event) => updateField('receivedDate', event.target.value)}
-              />
-            </label>
-            <label>
-              Дедлайн сборки
-              <input
-                type="date"
-                value={form.buildDeadline}
-                onChange={(event) => updateField('buildDeadline', event.target.value)}
-              />
-            </label>
-            <label>
-              Дата начала сборки
-              <input
-                type="date"
-                value={form.assemblyStartDate}
-                onChange={(event) => updateField('assemblyStartDate', event.target.value)}
-              />
-            </label>
-            <label>
-              Срок сборки, дней
+              Срок на все, дней
               <input
                 type="number"
                 min="0"
@@ -407,6 +377,11 @@ export default function BuildForm({ build, onClose, onSave, onDelete, saving }) 
                 onChange={(event) => updateField('assemblyTermDays', event.target.value)}
                 placeholder="Например: 10"
               />
+              <small>Считается от даты оплаты.</small>
+            </label>
+            <label>
+              Дедлайн
+              <input value={calculatedDeadline} placeholder="Дата оплаты + срок" readOnly />
             </label>
             <label>
               Последнее изменение

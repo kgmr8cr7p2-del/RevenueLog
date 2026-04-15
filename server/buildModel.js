@@ -90,14 +90,15 @@ export function normalizeBuild(input = {}, existing = {}) {
   if (normalized.status === 'paid' && !normalized.paymentDate) normalized.paymentDate = today;
   if (normalized.status === 'shipping' && !normalized.shippingDate) normalized.shippingDate = today;
   if (normalized.status === 'received' && !normalized.receivedDate) normalized.receivedDate = today;
-  if (normalized.assemblyTermDays && !normalized.assemblyStartDate) {
+  if (normalized.assemblyTermDays) {
     normalized.assemblyStartDate = normalized.paymentDate || normalized.createdAt.slice(0, 10);
-  }
-  if (normalized.assemblyTermDays && !normalized.buildDeadline) {
     normalized.buildDeadline = addDaysToDateString(
-      normalized.assemblyStartDate || normalized.paymentDate || normalized.createdAt,
+      normalized.assemblyStartDate,
       normalized.assemblyTermDays
     );
+  } else {
+    normalized.assemblyStartDate = normalized.paymentDate || normalized.assemblyStartDate;
+    normalized.buildDeadline = '';
   }
 
   return {
