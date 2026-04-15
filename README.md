@@ -67,6 +67,8 @@ setupAssemblyNotificationTrigger
 
 Если архив, уведомления или автокурс не работают, значит сайт уже обновлен, а Web App в Apps Script все еще работает на старой версии. После вставки нового `Code.gs` обязательно сделайте `Deploy -> Manage deployments -> Edit -> New version -> Deploy`.
 
+Для автокурса Bybit после вставки нового `Code.gs` один раз запустите функцию `authorizeExternalRequests` и подтвердите разрешение на внешние запросы. Без этого Apps Script не сможет вызвать Bybit через `UrlFetchApp.fetch`.
+
 Лист должен называться `PC Builds`. Столбцы создаются автоматически. Если создаете вручную, порядок такой:
 
 ```text

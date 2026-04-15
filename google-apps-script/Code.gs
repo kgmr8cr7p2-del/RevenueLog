@@ -549,6 +549,10 @@ function fetchBybitSellRate_() {
   };
 }
 
+function authorizeExternalRequests() {
+  return fetchBybitSellRate_();
+}
+
 function checkAssemblyNotifications() {
   const properties = PropertiesService.getScriptProperties();
   const botToken = properties.getProperty('BOT_TOKEN');
