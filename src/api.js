@@ -153,7 +153,14 @@ async function appsScriptRequest(action, payload = null) {
       }
 
       const url = buildAppsScriptRequestUrl(action, payload);
-      return jsonpAppsScriptRequest(url);
+      try {
+        return await fetchAppsScriptRequest(url);
+      } catch (fallbackError) {
+        if (!isRetryableAppsScriptError(fallbackError)) {
+          throw fallbackError;
+        }
+        return jsonpAppsScriptRequest(url);
+      }
     }
   }
 
