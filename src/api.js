@@ -30,11 +30,10 @@ function compactBuildPayload(build) {
   };
 }
 
-function appsScriptRequest(action, payload = null) {
-  const callbackName = `__pcBuilds${Date.now()}${Math.random().toString(36).slice(2)}`;
+function buildAppsScriptRequestUrl(action, payload = null, callbackName = '') {
   const url = new URL(getAppsScriptUrl());
   url.searchParams.set('action', action);
-  url.searchParams.set('callback', callbackName);
+  if (callbackName) url.searchParams.set('callback', callbackName);
 
   const initData = getTelegramInitData();
   if (initData) url.searchParams.set('initData', initData);
@@ -46,7 +45,36 @@ function appsScriptRequest(action, payload = null) {
     );
   }
 
+  return url;
+}
+
+async function fetchAppsScriptRequest(url) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const response = await fetch(url.toString(), {
+      cache: 'no-store',
+      credentials: 'omit',
+      mode: 'cors',
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    const data = await response.json();
+    if (!data?.ok) {
+      throw new Error(data?.error || 'Ошибка Apps Script');
+    }
+    return data;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+function jsonpAppsScriptRequest(url) {
   return new Promise((resolve, reject) => {
+    const callbackName = `__pcBuilds${Date.now()}${Math.random().toString(36).slice(2)}`;
+    const jsonpUrl = new URL(url.toString());
+    jsonpUrl.searchParams.set('callback', callbackName);
     const script = document.createElement('script');
     const timeout = window.setTimeout(() => {
       cleanup();
@@ -73,9 +101,26 @@ function appsScriptRequest(action, payload = null) {
       reject(new Error('Не удалось подключиться к Apps Script'));
     };
 
-    script.src = url.toString();
+    script.src = jsonpUrl.toString();
     document.body.appendChild(script);
   });
+}
+
+async function appsScriptRequest(action, payload = null) {
+  const url = buildAppsScriptRequestUrl(action, payload);
+
+  try {
+    return await fetchAppsScriptRequest(url);
+  } catch (error) {
+    const canRetryWithJsonp =
+      error.name === 'AbortError' ||
+      error.name === 'SyntaxError' ||
+      /Failed to fetch|NetworkError|Load failed|abort/i.test(error.message || '');
+    if (!canRetryWithJsonp) {
+      throw error;
+    }
+    return jsonpAppsScriptRequest(url);
+  }
 }
 
 function appendHiddenField(form, name, value) {
