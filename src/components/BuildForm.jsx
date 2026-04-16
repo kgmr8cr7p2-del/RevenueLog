@@ -173,6 +173,11 @@ export default function BuildForm({ build, onClose, onSave, onDelete, onUploadCo
 
   function submit(event) {
     event.preventDefault();
+    if (fileUploading) {
+      setFileMessage('Дождитесь окончания загрузки договора.');
+      return;
+    }
+
     const buildDeadline = addDaysToDateString(form.paymentDate, form.assemblyTermDays);
     const payload = { ...form, assemblyStartDate: form.paymentDate, buildDeadline };
     onSave({ ...payload, totals: calculateTotals(payload) });
@@ -471,8 +476,8 @@ export default function BuildForm({ build, onClose, onSave, onDelete, onUploadCo
           ) : (
             <span />
           )}
-          <button type="submit" className="primary-button" disabled={saving}>
-            {saving ? 'Сохранение...' : 'Сохранить'}
+          <button type="submit" className="primary-button" disabled={saving || fileUploading}>
+            {fileUploading ? 'Загрузка файла...' : saving ? 'Сохранение...' : 'Сохранить'}
           </button>
         </footer>
       </form>
