@@ -89,10 +89,22 @@ function doPost(e) {
   try {
     assertTelegramAuth_(e.parameter.initData || '');
     const action = e.parameter.action || '';
-    if (action !== 'uploadContractFile') throw new Error('Unknown POST action');
-    const item = uploadContractFile_(e);
-    return postMessageResponse_({ ok: true, item, messageId });
+    if (action === 'uploadContractFile') {
+      const item = uploadContractFile_(e);
+      return postMessageResponse_({ ok: true, item, messageId });
+    }
+
+    const payload = parsePayload_(e.parameter.payload || '{}');
+    const result = route_(action, payload);
+    return jsonp_('', Object.assign({ ok: true }, result));
   } catch (error) {
+    if ((e.parameter.action || '') !== 'uploadContractFile') {
+      return jsonp_('', {
+        ok: false,
+        error: error && error.message ? error.message : String(error)
+      });
+    }
+
     return postMessageResponse_({
       ok: false,
       messageId,

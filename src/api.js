@@ -40,12 +40,17 @@ function buildAppsScriptRequestUrl(action, payload = null, callbackName = '') {
   if (payload !== null) url.searchParams.set('payload', JSON.stringify(payload));
 
   if (url.toString().length > 7000) {
-    return Promise.reject(
-      new Error('Слишком много текста для сохранения через Apps Script. Сократите заметку или названия комплектующих.')
-    );
+    throw new Error('Слишком много текста для сохранения через Apps Script. Сократите заметку или названия комплектующих.');
   }
 
   return url;
+}
+
+function readAppsScriptResponse(data) {
+  if (!data?.ok) {
+    throw new Error(data?.error || 'Ошибка Apps Script');
+  }
+  return data;
 }
 
 async function fetchAppsScriptRequest(url) {
@@ -61,10 +66,34 @@ async function fetchAppsScriptRequest(url) {
       signal: controller.signal
     });
     const data = await response.json();
-    if (!data?.ok) {
-      throw new Error(data?.error || 'Ошибка Apps Script');
-    }
-    return data;
+    return readAppsScriptResponse(data);
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
+
+async function postAppsScriptRequest(action, payload = null) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
+  const body = new URLSearchParams();
+  body.set('action', action);
+
+  const initData = getTelegramInitData();
+  if (initData) body.set('initData', initData);
+  if (payload !== null) body.set('payload', JSON.stringify(payload));
+
+  try {
+    const response = await fetch(getAppsScriptUrl(), {
+      method: 'POST',
+      body,
+      cache: 'no-store',
+      credentials: 'omit',
+      mode: 'cors',
+      redirect: 'follow',
+      signal: controller.signal
+    });
+    const data = await response.json();
+    return readAppsScriptResponse(data);
   } finally {
     window.clearTimeout(timeout);
   }
@@ -89,11 +118,11 @@ function jsonpAppsScriptRequest(url) {
 
     window[callbackName] = (data) => {
       cleanup();
-      if (!data?.ok) {
-        reject(new Error(data?.error || 'Ошибка Apps Script'));
-        return;
+      try {
+        resolve(readAppsScriptResponse(data));
+      } catch (error) {
+        reject(error);
       }
-      resolve(data);
     };
 
     script.onerror = () => {
@@ -106,17 +135,34 @@ function jsonpAppsScriptRequest(url) {
   });
 }
 
+function isRetryableAppsScriptError(error) {
+  return (
+    error.name === 'AbortError' ||
+    error.name === 'SyntaxError' ||
+    /Failed to fetch|NetworkError|Load failed|abort/i.test(error.message || '')
+  );
+}
+
 async function appsScriptRequest(action, payload = null) {
+  if (action !== 'list') {
+    try {
+      return await postAppsScriptRequest(action, payload);
+    } catch (error) {
+      if (!isRetryableAppsScriptError(error)) {
+        throw error;
+      }
+
+      const url = buildAppsScriptRequestUrl(action, payload);
+      return jsonpAppsScriptRequest(url);
+    }
+  }
+
   const url = buildAppsScriptRequestUrl(action, payload);
 
   try {
     return await fetchAppsScriptRequest(url);
   } catch (error) {
-    const canRetryWithJsonp =
-      error.name === 'AbortError' ||
-      error.name === 'SyntaxError' ||
-      /Failed to fetch|NetworkError|Load failed|abort/i.test(error.message || '');
-    if (!canRetryWithJsonp) {
+    if (!isRetryableAppsScriptError(error)) {
       throw error;
     }
     return jsonpAppsScriptRequest(url);
