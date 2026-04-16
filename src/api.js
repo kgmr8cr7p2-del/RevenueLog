@@ -72,9 +72,9 @@ async function fetchAppsScriptRequest(url) {
   }
 }
 
-async function postAppsScriptRequest(action, payload = null) {
+async function postAppsScriptRequest(action, payload = null, timeoutMs = 20000) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 20000);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
   const body = new URLSearchParams();
   body.set('action', action);
 
@@ -176,79 +176,43 @@ async function appsScriptRequest(action, payload = null) {
   }
 }
 
-function appendHiddenField(form, name, value) {
-  const input = document.createElement('input');
-  input.type = 'hidden';
-  input.name = name;
-  input.value = value;
-  form.appendChild(input);
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.split(',').pop() : result);
+    };
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл договора'));
+    reader.readAsDataURL(file);
+  });
 }
 
-function uploadContractFileViaAppsScript(buildId, file) {
+async function uploadContractFileViaAppsScript(buildId, file) {
   if (!file) return Promise.reject(new Error('Выберите файл договора'));
+  if (file.size > 15 * 1024 * 1024) {
+    throw new Error('Файл договора слишком большой. Загрузите файл до 15 МБ.');
+  }
 
-  return new Promise((resolve, reject) => {
-    const messageId = `upload-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const frameName = `contract-upload-${messageId}`;
-    const iframe = document.createElement('iframe');
-    const form = document.createElement('form');
-    const fileInput = document.createElement('input');
-    const timeout = window.setTimeout(() => {
-      cleanup();
-      reject(new Error('Apps Script не ответил на загрузку файла'));
-    }, 60000);
-
-    function cleanup() {
-      window.clearTimeout(timeout);
-      window.removeEventListener('message', handleMessage);
-      form.remove();
-      iframe.remove();
+  const dataBase64 = await readFileAsBase64(file);
+  try {
+    const data = await postAppsScriptRequest(
+      'uploadContractFileData',
+      {
+        buildId,
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        dataBase64
+      },
+      60000
+    );
+    return data.item;
+  } catch (error) {
+    if (isRetryableAppsScriptError(error)) {
+      throw new Error('Apps Script не принял загрузку файла. Обновите Code.gs и сделайте New version -> Deploy.');
     }
-
-    function handleMessage(event) {
-      const data = event.data || {};
-      if (data.source !== 'pc-builds-upload' || data.messageId !== messageId) return;
-      cleanup();
-      if (!data.ok) {
-        reject(new Error(data.error || 'Файл договора не загружен'));
-        return;
-      }
-      resolve(data.item);
-    }
-
-    try {
-      const transfer = new DataTransfer();
-      transfer.items.add(file);
-      fileInput.files = transfer.files;
-    } catch (error) {
-      cleanup();
-      reject(new Error('Браузер не смог подготовить файл к загрузке'));
-      return;
-    }
-
-    iframe.name = frameName;
-    iframe.style.display = 'none';
-
-    form.method = 'POST';
-    form.action = getAppsScriptUrl();
-    form.target = frameName;
-    form.enctype = 'multipart/form-data';
-    form.style.display = 'none';
-
-    appendHiddenField(form, 'action', 'uploadContractFile');
-    appendHiddenField(form, 'messageId', messageId);
-    appendHiddenField(form, 'buildId', buildId);
-    appendHiddenField(form, 'initData', getTelegramInitData());
-
-    fileInput.type = 'file';
-    fileInput.name = 'file';
-    form.appendChild(fileInput);
-
-    window.addEventListener('message', handleMessage);
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-    form.submit();
-  });
+    throw error;
+  }
 }
 
 async function request(path, options = {}) {

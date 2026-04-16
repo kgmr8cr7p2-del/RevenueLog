@@ -1,6 +1,6 @@
 const SPREADSHEET_ID = '1nTQV1MGkjdDLkrwq_FjFCYLj6olrtkpwFwB2ord0fjs';
 const SHEET_NAME = 'PC Builds';
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 const STATUSES = ['assembly', 'paid', 'shipping', 'received'];
 const STATUS_TITLES = {
@@ -144,6 +144,10 @@ function route_(action, payload) {
     return { result: remindDeadlines_() };
   }
 
+  if (action === 'uploadContractFileData') {
+    return { item: uploadContractFileData_(payload) };
+  }
+
   if (action === 'delete') {
     deleteBuild_(payload.id);
     return { deleted: true };
@@ -283,13 +287,30 @@ function uploadContractFile_(e) {
     throw new Error('Файл договора не получен');
   }
 
+  return saveContractFile_(buildId, fileBlob, fileBlob.getName() || 'contract');
+}
+
+function uploadContractFileData_(payload) {
+  const buildId = String(payload.buildId || '');
+  if (!buildId) throw new Error('Build ID is required');
+
+  const originalName = String(payload.fileName || 'contract');
+  const dataBase64 = String(payload.dataBase64 || '').replace(/^data:[^,]+,/, '');
+  if (!dataBase64) throw new Error('Файл договора не получен');
+
+  const mimeType = String(payload.mimeType || 'application/octet-stream');
+  const bytes = Utilities.base64Decode(dataBase64);
+  const fileBlob = Utilities.newBlob(bytes, mimeType, originalName);
+  return saveContractFile_(buildId, fileBlob, originalName);
+}
+
+function saveContractFile_(buildId, fileBlob, originalName) {
   const sheet = getSheet_();
   const rowNumber = findRowById_(sheet, buildId);
   if (!rowNumber) throw new Error('Build not found');
 
   const existing = fromRow_(sheet.getRange(rowNumber, 1, 1, HEADER.length).getValues()[0]);
   const folder = getContractFilesFolder_();
-  const originalName = fileBlob.getName() || 'contract';
   if (!/\.(pdf|doc|docx)$/i.test(originalName)) {
     throw new Error('Можно загрузить только PDF, DOC или DOCX');
   }

@@ -18,7 +18,7 @@ import FinanceTab from './components/FinanceTab.jsx';
 import SettingsTab from './components/SettingsTab.jsx';
 import { getTelegramUser, initializeTelegram, requestTelegramFullscreen } from './telegram.js';
 
-const REQUIRED_SCHEMA_VERSION = 5;
+const REQUIRED_SCHEMA_VERSION = 6;
 
 const TABS = [
   { id: 'builds', title: 'Сборки ПК' },
