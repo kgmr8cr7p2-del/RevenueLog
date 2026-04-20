@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = Number(process.env.PORT || 3001);
 const store = await createStore();
-const schemaVersion = 5;
+const schemaVersion = 6;
 
 function roundRate(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
